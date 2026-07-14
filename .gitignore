@@ -40,6 +40,11 @@ yarn-error.log*
 .superpowers/
 .playwright-mcp/
 
+# agent config: .claude/ IS committed (skills + shared plugin/hook config).
+# Only personal overrides and generated graph output stay local.
+.claude/settings.local.json
+graphify-out/
+
 # vercel
 .vercel
 
