@@ -1,0 +1,31 @@
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  font-size: 1rem;
+  line-height: 1;
+  color: var(--color-text);
+  cursor: pointer;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.toggle:hover {
+  border-color: var(--color-accent);
+}
+
+.dark {
+  display: none;
+}
+
+:global(:root[data-theme='dark']) .light {
+  display: none;
+}
+
+:global(:root[data-theme='dark']) .dark {
+  display: inline;
+}

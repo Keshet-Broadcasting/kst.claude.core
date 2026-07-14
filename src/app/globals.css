@@ -1,0 +1,52 @@
+:root {
+  --color-bg: #ffffff;
+  --color-surface: #f6f7f9;
+  --color-text: #12141a;
+  --color-muted: #5c6270;
+  --color-accent: #4f46e5;
+  --color-accent-contrast: #ffffff;
+  --color-border: #e3e6eb;
+  --color-danger: #dc2626;
+
+  --radius: 10px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 16px;
+  --space-4: 24px;
+  --space-5: 40px;
+
+  --font-sans: var(--font-geist-sans), system-ui, sans-serif;
+}
+
+:root[data-theme='dark'] {
+  --color-bg: #0d0f14;
+  --color-surface: #161a22;
+  --color-text: #e8eaee;
+  --color-muted: #9aa1ad;
+  --color-accent: #8b85f5;
+  --color-accent-contrast: #12141a;
+  --color-border: #262c38;
+  --color-danger: #f87171;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-height: 100dvh;
+  margin: 0;
+  font-family: var(--font-sans);
+  color: var(--color-text);
+  background: var(--color-bg);
+}
+
+/* Honors the persisted `reduceMotion` preference — see PreferenceToggle, which stamps this
+   attribute on <html>. Neutralises transitions/animations everywhere while it is set. */
+:root[data-reduce-motion='true'] *,
+:root[data-reduce-motion='true'] *::before,
+:root[data-reduce-motion='true'] *::after {
+  transition-duration: 0.01ms !important;
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+}
