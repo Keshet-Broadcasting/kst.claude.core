@@ -26,19 +26,31 @@ pnpm dev
 
 Open http://localhost:3000.
 
+## Claude Code plugins
+
+This project expects the Claude Code plugins enabled in `.claude/settings.json`. They are not
+bundled in the repo, so install them once per clone:
+
+```bash
+node scripts/setup-plugins.mjs
+```
+
+The script is idempotent and installs only what is missing. Restart Claude Code afterwards so
+the plugins load.
+
 ## Scripts
 
-| Script              | Purpose                    |
-| ------------------- | -------------------------- |
-| `pnpm dev`          | Dev server (Turbopack)     |
-| `pnpm build`        | Production build           |
-| `pnpm start`        | Serve the production build |
-| `pnpm lint`         | ESLint                     |
-| `pnpm typecheck`    | `tsc --noEmit`             |
-| `pnpm format`       | Prettier (write)           |
-| `pnpm format:check` | Prettier (check only)      |
-| `pnpm test`         | Vitest                     |
-| `pnpm test:watch`   | Vitest, watch mode         |
+| Script           | Purpose                    |
+| ---------------- | -------------------------- |
+| `pnpm dev`       | Dev server (Turbopack)     |
+| `pnpm build`     | Production build           |
+| `pnpm start`     | Serve the production build |
+| `pnpm lint`      | ESLint                     |
+| `pnpm typecheck` | `tsc --noEmit`             |
+| `pnpm test`      | Vitest                     |
+
+Formatting is handled at the monorepo root (`pnpm format` / `pnpm format:check`), so it is
+not duplicated here.
 
 ## The patterns worth reading
 

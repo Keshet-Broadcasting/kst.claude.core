@@ -12,7 +12,7 @@ formats `*.css` but enforces nothing semantic — these conventions are yours to
 ## Design tokens (`src/app/globals.css`)
 
 Every token is a CSS custom property on `:root`. **Components must read tokens, never hard-code
-colours or spacing.** README.md:128 states this directly: "Stylesheets should read these tokens
+colours or spacing.** `README.md` (the design-tokens section) states this directly: "Stylesheets should read these tokens
 rather than hard-code colours, so theme switching and future rebranding stay one-file."
 
 Naming scheme: **kebab-case, `--<category>-<role>`**. Three categories exist today:
@@ -32,12 +32,12 @@ Naming scheme: **kebab-case, `--<category>-<role>`**. Three categories exist tod
 | ------------------------- | ----------------------------------------------- | ------------------------------------------ |
 | `--radius`                | `10px`                                          | the only radius; every rounded box uses it |
 | `--space-1` … `--space-5` | `4px` `8px` `16px` `24px` `40px`                | the whole spacing scale                    |
-| `--font-sans`             | `var(--font-geist-sans), system-ui, sans-serif` | fed by `next/font` in `layout.tsx:8`       |
+| `--font-sans`             | `var(--font-geist-sans), system-ui, sans-serif` | fed by `next/font` in `src/app/layout.tsx` |
 
 Rules that follow from the real files:
 
 - **Spacing** (`padding`, `margin`, `gap`) uses `var(--space-N)` — see every `.module.css`.
-  Only exception: raw px for a fixed control size (`ThemeToggle.module.css:5` — `width: 36px`).
+  Only exception: raw px for a fixed control size (`ThemeToggle.module.css`, the `width: 36px` rule).
 - **Colour** always `var(--color-*)`. There is not one literal hex outside `globals.css`.
 - **Adding a token** means adding it to _both_ blocks in `globals.css` — the `:root` light block
   and the `:root[data-theme='dark']` override block. Only colours are overridden in dark; radius,
@@ -53,7 +53,7 @@ in the CSS — `prefers-color-scheme` is consulted _once_, in JS, only as the fi
 The chain:
 
 1. `src/lib/theme.ts` exports `THEME_INIT_SCRIPT`, injected inline in `<head>` by
-   `src/app/layout.tsx:22`. It runs **before first paint**: reads `localStorage['starter.theme']`
+   `src/app/layout.tsx`. It runs **before first paint**: reads `localStorage['starter.theme']`
    (the Zustand persist entry), falls back to `matchMedia('(prefers-color-scheme: dark)')`, then
    sets `document.documentElement.dataset.theme`. This is the anti-flash script.
 2. `src/store/themeStore.ts` seeds itself _from_ `<html data-theme>` (`readInitialTheme`), and its
@@ -82,13 +82,13 @@ place `:global` appears (`ThemeToggle.module.css`), and only because `:root` liv
 ```
 
 Why both icons render and CSS picks one: branching the JSX on theme state would reintroduce a
-hydration mismatch (`ThemeToggle.tsx:15-18`). **Do the same for any theme-dependent visual — swap
+hydration mismatch (`ThemeToggle.tsx`). **Do the same for any theme-dependent visual — swap
 it in CSS, not in JSX.**
 
 ### The second attribute: `data-reduce-motion`
 
-`PreferenceToggle.tsx:19-21` stamps `document.documentElement.dataset.reduceMotion` from the app
-store, and `globals.css:46-52` neutralises motion globally off it:
+`PreferenceToggle.tsx` stamps `document.documentElement.dataset.reduceMotion` from the app
+store, and `globals.css` (the `data-reduce-motion` block) neutralises motion globally off it:
 
 ```css
 :root[data-reduce-motion='true'] *,
@@ -113,7 +113,7 @@ the house idiom for anything global. Don't reach for a class on `<body>`, and do
 - **Class names: plain camelCase, single words where possible.** No BEM, no kebab, no `__`/`--`.
   Real names in the repo: `.main`, `.hero`, `.top`, `.title`, `.pitch`, `.card`, `.description`,
   `.file`, `.grid`, `.footer`, `.badges`, `.badge`, `.toggle`, `.light`, `.dark`, and one
-  two-word case: `.preferences` / `.preferencesLabel` (`page.module.css:18`).
+  two-word case: `.preferences` / `.preferencesLabel` (`page.module.css`).
 - Names are **semantic and local to the component** (`.toggle`, `.card`), never utility-ish
   (`.mt-2`, `.flex`) — scoping means short generic names are safe and `.title` legitimately exists
   in three different modules.
@@ -165,7 +165,7 @@ Do **not** add a `clsx`/`classnames` dependency, and never write inline `style={
 
 ## Responsive & accessibility patterns
 
-- **No media queries exist.** Responsiveness is intrinsic: `page.module.css:24-31` uses
+- **No media queries exist.** Responsiveness is intrinsic: the `.grid` rule in `page.module.css` uses
   `grid-template-columns: repeat(auto-fill, minmax(240px, 1fr))`, `StackBadges` uses
   `flex-wrap: wrap`, `.main` uses `max-width: 880px; margin: 0 auto`. Solve layout with
   auto-fill/minmax, wrap, `max-width` + auto margins before adding the project's first `@media`.
@@ -176,7 +176,7 @@ Do **not** add a `clsx`/`classnames` dependency, and never write inline `style={
     border-color 0.15s ease,
     color 0.15s ease;
   ```
-  (`PreferenceToggle.module.css:9-12`.) They are globally defeated by `data-reduce-motion` — you
+  (`PreferenceToggle.module.css`.) They are globally defeated by `data-reduce-motion` — you
   get that for free, so don't hand-roll a motion guard.
 - **Focus:** there are **no** `:focus`/`:focus-visible` overrides — the browser default ring is
   intentionally left intact. Do not `outline: none`. If you must restyle focus, use
@@ -187,10 +187,11 @@ Do **not** add a `clsx`/`classnames` dependency, and never write inline `style={
 
 ## Next 16 global-CSS rules
 
-From `node_modules/next/dist/docs/01-app/01-getting-started/11-css.md`:
+From `node_modules/next/dist/docs/01-app/01-getting-started/11-css.md` (the vendored docs exist only
+**after `pnpm install`** — a freshly scaffolded app has no `node_modules` yet):
 
-- `globals.css` is imported exactly once, in the root layout (`src/app/layout.tsx:6`,
-  `import './globals.css';`). **Keep it that way.** Next permits a global import from any file in
+- `globals.css` is imported exactly once, in the root layout (`src/app/layout.tsx`, the
+  `import './globals.css';` line). **Keep it that way.** Next permits a global import from any file in
   `app/`, but its own docs warn stylesheets are not removed on navigation, so extra global imports
   can conflict. Global CSS = tokens + `body`/reset + document-level attribute rules. Nothing else.
 - Any other stylesheet must be `*.module.css`. A non-module `.css` import in a component is wrong here.
