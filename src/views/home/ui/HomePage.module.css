@@ -1,0 +1,9 @@
+.heroImage {
+  display: block;
+  width: min(520px, 36vw, 72vh);
+  min-width: 280px;
+  height: auto;
+  border-radius: 50%;
+  position: relative;
+  box-shadow: rgba(232, 160, 76, 0.18) 0 0 120px;
+}
