@@ -1,0 +1,11 @@
+{
+  "tagName": "demo-embed",
+  "urls": {
+    "development": "/demo-embed.js",
+    "staging": "/demo-embed.js",
+    "production": "/demo-embed.js"
+  },
+  "allowedProps": [],
+  "forbiddenProps": [],
+  "templateVersion": "1.0.0"
+}
