@@ -24,7 +24,7 @@ This project uses **pnpm**. Real scripts live in `package.json`:
 - `pnpm install` — install deps (vendors the Next docs into `node_modules/next/dist/docs/`)
 - `pnpm dev` — dev server (Turbopack)
 - `pnpm typecheck` — `tsc --noEmit`
-- `pnpm lint` — `eslint .`
+- `pnpm lint` — ESLint + steiger (FSD boundaries) + `embed:check`
 - `pnpm build` — production build
 - `pnpm test` — Vitest run
 
@@ -36,10 +36,22 @@ Work is not complete until `pnpm typecheck && pnpm lint && pnpm build && pnpm te
 
 # Architecture
 
-- `src/app/` — App Router: pages, layouts, `api/*` route handlers, `error`/`loading`/`not-found`. Server Components by default; add `"use client"` only at interaction leaves.
-- `src/components/<Name>/` — one component per folder (`.tsx` + `.module.css` + `.test.tsx`).
-- `src/lib/` — framework-free helpers (pure functions with unit tests).
-- `src/store/` — Zustand 5 stores + `AppStoreProvider` (store-per-request). **Never import a store into a Server Component** — read store state only under the provider, in Client Components.
+Feature-Sliced Design (FSD). Layer cheat sheet, top to bottom (each layer may only import from layers strictly below it; steiger enforces this):
+
+| Layer      | Path            | Holds                                                                                                                   |
+| ---------- | --------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `app`      | `src/app/`      | Providers (`AppStoreProvider`), global styles.                                                                          |
+| `pages`    | `src/views/`    | One folder per route's content; server-side data loading lives here.                                                    |
+| `widgets`  | `src/widgets/`  | Self-sufficient UI blocks composed from features/entities. Server components by default.                                |
+| `features` | `src/features/` | User actions. `'use client'` goes here, at the lowest point it's needed.                                                |
+| `entities` | `src/entities/` | Business state — stores, types, server-data contracts.                                                                  |
+| `shared`   | `src/shared/`   | UI kit, framework-free utilities, and `shared/embeds/`.                                                                 |
+
+Rules:
+
+- Every slice exports its public surface from its own `index.ts`. Nothing outside the slice imports past that file.
+- Next's App Router lives at root `app/` (routing only). Every route file is a thin re-export: `export { XPage as default } from '@/views/x'`.
+- Third-party widgets go in `src/shared/embeds/` — scaffold with `pnpm embed:add <name>`, never hand-write.
 
 # First session (fresh clone)
 
@@ -55,9 +67,34 @@ Work is not complete until `pnpm typecheck && pnpm lint && pnpm build && pnpm te
 - Never set `agentRules: false` in `next.config.ts`.
 - Never modify `.claude/settings.json` without an explicit user request.
 
+# Embeds — HARD RULE, no exceptions
+
+Any third-party widget delivered as a `<script>` + custom element MUST be installed via `pnpm embed:add <name>`. Hand-writing files in `src/shared/embeds/` is forbidden — the lint system will catch it, and it bypasses the `embed.json` contract that `embed:check` enforces.
+
+Steps, always in this order:
+1. `pnpm embed:add <name>` — scaffold the folder.
+2. Fill in `embed.json` — real URLs, `allowedProps`, `forbiddenProps`.
+3. Extend the generated component — add props, error state, any custom logic.
+
+Never skip step 1. Never create the folder by hand. Read the `embeds` skill before starting.
+
 # Skills (`.claude/skills/`)
 
-- `nextjs-16` — Next.js 16 App Router, caching, breaking changes vs 14/15.
-- `react-19` — React 19 hooks, refs, Server/Client boundaries, Actions.
-- `zustand-5` — Zustand 5 store-per-request with the App Router.
-- `css-modules` — CSS Modules with custom-property design tokens and theming.
+Read the relevant skill before writing code in its domain.
+
+- `nextjs-16` — App Router, caching, breaking changes vs 14/15.
+- `react-19` — hooks, Server Actions, transitions.
+- `routing` — pages, dynamic routes, route handlers.
+- `server-vs-client` — when to add `'use client'`, streaming.
+- `fsd` — FSD layers, where to put any new file, steiger errors.
+- `feature-workflow` — end-to-end checklist for a new feature.
+- `zustand-5` — store factory, provider pattern, selectors.
+- `state-management-guide` — decision tree for state placement.
+- `data-fetching` — RSC fetch, `use cache`, Suspense.
+- `css-modules` — design tokens, theming, dark mode.
+- `forms` — Server Actions, `useActionState`, zod, a11y.
+- `loading-and-error` — `loading.tsx`, `error.tsx`, Suspense.
+- `image-and-fonts` — `next/image`, `next/font`.
+- `embeds` — `pnpm embed:add`, custom element lifecycle, `embed.json`.
+- `definition-of-done` — checklist before declaring work complete.
+- `env-vars` — `.env.local`, `NEXT_PUBLIC_`, zod validation.

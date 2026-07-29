@@ -34,6 +34,28 @@ line numbers, so they survive patch bumps). Do not trust React 18 muscle memory 
 Also new in 19 / 19.2 and present in these types: `use`, `useActionState`, `useOptimistic`,
 `cache`, `cacheSignal` (19.2), `useEffectEvent`. (Search each name in `@types/react`.)
 
+### `useEffectEvent` — stable event handlers that see current values
+
+```ts
+function useEffectEvent<T extends Function>(event: T): T;
+```
+
+Extracts a callback from a `useEffect` dependency array without making it a dependency. Use when
+you need to read a value inside an effect but the value changes too often or causes unwanted
+re-runs. The returned function is stable (same reference) but always sees fresh props/state.
+Not callable outside an effect — only call it from inside a `useEffect` body.
+
+### `cache` — per-request memoisation on the server
+
+```ts
+function cache<T>(fn: (...args: unknown[]) => T): (...args: unknown[]) => T;
+```
+
+Server-only (throws if called during client render). Wraps an async function so identical
+arguments within one server request share one promise. Use it on DB/API helpers that may be called
+from multiple Server Components in one render tree. Not a substitute for Next's `unstable_cache`
+(which persists across requests) — `cache` is per-render-pass only.
+
 ## The useRef trap
 
 This is the single most common break. There are exactly **three** overloads, all requiring an
@@ -59,25 +81,28 @@ Notes:
   is gone; do **not** import `MutableRefObject`.
 - Always read `.current` behind a guard: `inputRef.current?.focus()`.
 - Never read or write `.current` **during render** — this repo's `eslint-config-next` flags it.
-  `src/store/AppStoreProvider.tsx` documents exactly this and uses `useState(() => …)` as the
+  `src/app/AppStoreProvider.tsx` documents exactly this and uses `useState(() => …)` as the
   lazy-init escape hatch instead of a ref. Follow that pattern.
 
 ## Server vs Client Components (Next 16 App Router)
 
-Everything under `src/app` is a **Server Component by default**. `'use client'` is an opt-in
-marker that must be the first line of the file; it makes that module _and everything it imports_
-part of the client bundle.
+Everything under root `app/` (the Next routing directory — routing only, per this project's FSD
+layout) is a **Server Component by default**. `'use client'` is an opt-in marker that must be the
+first line of the file; it makes that module _and everything it imports_ part of the client
+bundle. This defaults to server for FSD's `pages`/`widgets` layers too (`src/views/*`,
+`src/widgets/*`) — `'use client'` only appears at the lowest point it's actually needed, in
+`features` (and in cross-cutting `shared` pieces like `ThemeToggle` and the `src/app` provider).
 
-|                                                        | Server Component (default)                                                                                             | Client Component (`'use client'`)                                                                                                                           |
-| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Examples here                                          | `src/app/page.tsx`, `src/app/layout.tsx`, `src/components/PatternCard/PatternCard.tsx`, `src/components/Hero/Hero.tsx` | `src/app/error.tsx`, `src/components/ThemeToggle/ThemeToggle.tsx`, `src/components/PreferenceToggle/PreferenceToggle.tsx`, `src/store/AppStoreProvider.tsx` |
-| Hooks                                                  | ❌ none (`useState`, `useEffect`, `useRef`, `useOptimistic`, `useFormStatus`)                                          | ✅ all                                                                                                                                                      |
-| `use(promise)` / `use(Context)`                        | ✅ allowed                                                                                                             | ✅ allowed                                                                                                                                                  |
-| Event handlers (`onClick`, …)                          | ❌                                                                                                                     | ✅                                                                                                                                                          |
-| Browser globals (`window`, `document`, `localStorage`) | ❌                                                                                                                     | ✅ (in effects / handlers, not during render — hydration)                                                                                                   |
-| `async function Component()`                           | ✅ (the call signature allows `Promise<ReactNode>`)                                                                    | ❌                                                                                                                                                          |
-| Zustand store (`useAppStore`, `useThemeStore`)         | ❌                                                                                                                     | ✅                                                                                                                                                          |
-| Secrets / server-only modules                          | ✅                                                                                                                     | ❌ (would ship to the browser)                                                                                                                              |
+|                                                        | Server Component (default)                                                                                                  | Client Component (`'use client'`)                                                                                                                                 |
+| ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Examples here                                          | `app/page.tsx`, `app/layout.tsx`, `src/views/home/ui/HomePage.tsx`, `src/widgets/preferences-panel/ui/PreferencesPanel.tsx` | `app/error.tsx`, `src/shared/ui/ThemeToggle/ThemeToggle.tsx`, `src/features/toggle-reduce-motion/ui/ToggleReduceMotionButton.tsx`, `src/app/AppStoreProvider.tsx` |
+| Hooks                                                  | ❌ none (`useState`, `useEffect`, `useRef`, `useOptimistic`, `useFormStatus`)                                               | ✅ all                                                                                                                                                            |
+| `use(promise)` / `use(Context)`                        | ✅ allowed                                                                                                                  | ✅ allowed                                                                                                                                                        |
+| Event handlers (`onClick`, …)                          | ❌                                                                                                                          | ✅                                                                                                                                                                |
+| Browser globals (`window`, `document`, `localStorage`) | ❌                                                                                                                          | ✅ (in effects / handlers, not during render — hydration)                                                                                                         |
+| `async function Component()`                           | ✅ (the call signature allows `Promise<ReactNode>`)                                                                         | ❌                                                                                                                                                                |
+| Zustand store (`useAppStore`, `useThemeStore`)         | ❌                                                                                                                          | ✅                                                                                                                                                                |
+| Secrets / server-only modules                          | ✅                                                                                                                          | ❌ (would ship to the browser)                                                                                                                                    |
 
 **What cannot cross the boundary** — props passed from a Server Component into a Client Component
 must be serializable:
@@ -93,12 +118,110 @@ must be serializable:
 Rules of thumb, in this codebase's style:
 
 - Push `'use client'` **down the tree**, to the leaf that actually needs interactivity.
-  `page.tsx` stays a Server Component and renders a client `<PreferenceToggle />`.
+  `views/home/ui/HomePage.tsx` stays a Server Component; only
+  `features/toggle-reduce-motion/ui/ToggleReduceMotionButton.tsx`, nested inside it through the
+  `widgets/preferences-panel` composition, is `'use client'`.
 - A Server Component can render a Client Component. A Client Component can only render a Server
   Component if it arrives **as `children`** (see `AppStoreProvider` wrapping `{children}` in
   `layout.tsx`).
 - Server-computed data is handed in as props, not fetched from our own route (`layout.tsx` calls
   `getInitialAppState()` directly).
+
+## Transitions & Concurrent Features
+
+### `useTransition` and `startTransition` — React 19 upgrade
+
+```ts
+function useTransition(): [isPending: boolean, startTransition: TransitionStartFunction];
+function startTransition(action: () => void | Promise<void>): void;
+```
+
+**React 19 change:** `startTransition` now accepts an **async function** (it didn't in React 18).
+Awaiting a Server Action inside `startTransition` keeps `isPending` true for the full round-trip.
+
+```tsx
+'use client';
+import { useTransition } from 'react';
+import { saveAction } from '../api/save';
+
+export function SaveButton({ id }: { id: string }) {
+  const [isPending, startTransition] = useTransition();
+
+  return (
+    <button
+      disabled={isPending}
+      onClick={() => {
+        startTransition(async () => {
+          await saveAction(id); // async — React 19 supports this
+        });
+      }}
+    >
+      {isPending ? 'Saving…' : 'Save'}
+    </button>
+  );
+}
+```
+
+Rules:
+
+- `useTransition` is Client-only (needs `'use client'`). `startTransition` (standalone import) can
+  wrap async work anywhere, including Server Components — but reading `isPending` requires the hook.
+- State updates inside a transition are non-urgent: React may defer them if higher-priority updates
+  arrive. Never wrap user-typed input in a transition; do wrap network calls and navigation.
+- `useActionState`'s third `isPending` element covers the same pattern for form submissions — prefer
+  it over a manual `useTransition` when the trigger is a `<form action>`.
+
+## Server Actions (`'use server'`)
+
+A Server Action is an async function that runs **on the server**, callable from Client Components
+as if it were a regular function. Two declaration forms:
+
+```ts
+// File-level directive — every export in this file becomes a Server Action
+'use server';
+
+export async function subscribe(fd: FormData): Promise<{ error?: string }> {
+  const email = fd.get('email') as string;
+  // db call, email send, etc.
+  return {};
+}
+```
+
+```ts
+// Inline directive — a single function inside a Server Component
+async function handleSubmit(fd: FormData) {
+  'use server';
+  // runs on the server
+}
+```
+
+In this codebase, Server Actions live in `features/<name>/api/` (FSD rule — not in
+`widgets` or `views`). Pass them to Client Components as props (they are serializable):
+
+```tsx
+// src/features/subscribe/api/subscribe.ts  (file-level 'use server')
+// src/features/subscribe/ui/SubscribeForm.tsx  ('use client', receives the action as prop)
+// src/views/home/ui/HomePage.tsx (Server Component — imports both and wires them)
+```
+
+Never import a `'use server'` file from a `'use client'` file directly — Next will bundle-split
+it correctly only when passed as a serializable prop or used via `useActionState`.
+
+## Hydration
+
+React 19 improved hydration error messages. When server HTML and client render differ, you now
+see a **diff** in the console showing the expected vs actual element tree — no more generic
+"Text content did not match" message.
+
+Common sources of hydration mismatches in this codebase:
+
+- Accessing `window`/`document`/`localStorage` during initial render (always guard with `useEffect`)
+- Date/time rendering without a stable seed (see `ThemeToggle.tsx` — uses `useEffect` to read `prefers-color-scheme`)
+- Dynamic className based on browser state (same fix: apply in `useEffect`, not during render)
+
+`suppressHydrationWarning` on a DOM element tells React to skip that element's mismatch check.
+Use it only for intentionally dynamic content (e.g., a timestamp rendered server-side as
+placeholder). Never use it to silence a real bug.
 
 ## Forms & Actions
 
@@ -189,20 +312,23 @@ function use<T>(usable: Usable<T>): T;
 
 ## Common mistakes
 
-| Mistake                                                               | Fix                                                                                                        |
-| --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `const ref = useRef<HTMLDivElement>()`                                | `useRef<HTMLDivElement>(null)`                                                                             |
-| `import { MutableRefObject } from 'react'`                            | Use `RefObject<T>`; annotate as `RefObject<HTMLDivElement \| null>`                                        |
-| Wrapping a new component in `forwardRef`                              | Declare `ref` as a plain prop: `function Field({ ref, ...rest }: { ref?: Ref<HTMLInputElement> } & Props)` |
-| `import { useFormState } from 'react-dom'`                            | `import { useActionState } from 'react'` — and remember the third `isPending` element                      |
-| Destructuring 2 values from `useActionState`                          | It returns `[state, action, isPending]`                                                                    |
-| `useFormStatus()` in the component that renders `<form>`              | Move it into a child rendered inside the form                                                              |
-| `useState`/`useEffect`/Zustand in a file without `'use client'`       | Add `'use client'`, or move the interactivity into a leaf client component                                 |
-| Adding `'use client'` to `page.tsx`/`layout.tsx` to fix one button    | Keep the page a Server Component; extract the button (see `PreferenceToggle`)                              |
-| Passing a callback prop from a Server Component to a Client Component | Pass a Server Action, or make the parent a Client Component                                                |
-| Reading `ref.current` during render                                   | Lazy-init with `useState(() => …)` — see `src/store/AppStoreProvider.tsx`                                  |
-| Touching `document`/`window` during a client render                   | Do it in `useEffect` — see `PreferenceToggle.tsx`, `ThemeToggle.tsx`                                       |
-| `Component.defaultProps = {...}`                                      | Default parameters in the destructure                                                                      |
+| Mistake                                                                 | Fix                                                                                                                                     |
+| ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `const ref = useRef<HTMLDivElement>()`                                  | `useRef<HTMLDivElement>(null)`                                                                                                          |
+| `import { MutableRefObject } from 'react'`                              | Use `RefObject<T>`; annotate as `RefObject<HTMLDivElement \| null>`                                                                     |
+| Wrapping a new component in `forwardRef`                                | Declare `ref` as a plain prop: `function Field({ ref, ...rest }: { ref?: Ref<HTMLInputElement> } & Props)`                              |
+| `import { useFormState } from 'react-dom'`                              | `import { useActionState } from 'react'` — and remember the third `isPending` element                                                   |
+| Destructuring 2 values from `useActionState`                            | It returns `[state, action, isPending]`                                                                                                 |
+| `useFormStatus()` in the component that renders `<form>`                | Move it into a child rendered inside the form                                                                                           |
+| `useState`/`useEffect`/Zustand in a file without `'use client'`         | Add `'use client'`, or move the interactivity into a leaf client component                                                              |
+| Adding `'use client'` to `page.tsx`/`layout.tsx` to fix one button      | Keep the page a Server Component; extract the button (see `ToggleReduceMotionButton`)                                                   |
+| Passing a callback prop from a Server Component to a Client Component   | Pass a Server Action, or make the parent a Client Component                                                                             |
+| Reading `ref.current` during render                                     | Lazy-init with `useState(() => …)` — see `src/app/AppStoreProvider.tsx`                                                                 |
+| Touching `document`/`window` during a client render                     | Do it in `useEffect` — see `ToggleReduceMotionButton.tsx`, `ThemeToggle.tsx`                                                            |
+| `Component.defaultProps = {...}`                                        | Default parameters in the destructure                                                                                                   |
+| Passing async fn to `startTransition` in React 18 style (no-op)         | In React 19 this works — async transitions keep `isPending` true for the full async duration                                            |
+| Importing a `'use server'` function directly into a `'use client'` file | Pass Server Actions as props from a Server Component, or use via `useActionState`                                                       |
+| Using `suppressHydrationWarning` to silence a real mismatch             | Find and fix the cause (usually `window`/`Date` read during render); `suppressHydrationWarning` is for intentional dynamic content only |
 
 House style (match it): named function exports (`export function Foo`), a local `type Props = {...}`,
 CSS Modules imported **last** (`import styles from './Foo.module.css'`), one folder per component

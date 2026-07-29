@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Embed manifest",
+  "type": "object",
+  "required": ["tagName", "urls", "allowedProps", "forbiddenProps", "templateVersion"],
+  "additionalProperties": false,
+  "properties": {
+    "tagName": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(-[a-z0-9]+)+$",
+      "description": "Custom element tag name; must contain at least one hyphen."
+    },
+    "urls": {
+      "type": "object",
+      "required": ["development", "staging", "production"],
+      "additionalProperties": false,
+      "properties": {
+        "development": { "type": "string", "minLength": 1 },
+        "staging": { "type": "string", "minLength": 1 },
+        "production": { "type": "string", "minLength": 1 }
+      }
+    },
+    "allowedProps": { "type": "array", "items": { "type": "string" } },
+    "forbiddenProps": { "type": "array", "items": { "type": "string" } },
+    "templateVersion": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" }
+  }
+}
