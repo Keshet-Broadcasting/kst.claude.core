@@ -102,7 +102,7 @@ export async function GET(_req: NextRequest, ctx: RouteContext<'/users/[id]'>) {
 
 Longhand: `{ params }: { params: Promise<{ id: string }> }`. Methods: `GET POST PUT PATCH DELETE HEAD OPTIONS`. `fetch` memoization does **not** apply in route handlers. Source: `01-app/03-api-reference/03-file-conventions/route.md`.
 
-This project's existing handler (`src/app/api/health/route.ts`) uses `NextResponse.json` with no params — that shape is still valid.
+This project's existing handler (`app/api/health/route.ts`) uses `NextResponse.json` with no params — that shape is still valid.
 
 ### Async request APIs
 
@@ -235,6 +235,171 @@ export default function Page() {
 
 ---
 
+## App Router file conventions
+
+Every route segment can export these special files. **`error.tsx` must be `'use client'`** — all others can be Server Components.
+
+| File               | Purpose                                                                                                          | Notes                                                                                                                                       |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `page.tsx`         | Route's unique UI; makes the segment publicly accessible                                                         | `params` / `searchParams` are Promises — see Correct Signatures above                                                                       |
+| `layout.tsx`       | Shared UI that wraps child segments; **does not re-render on navigation** (state is preserved)                   | Root layout must include `<html>` and `<body>`; `params` is a Promise                                                                       |
+| `template.tsx`     | Like `layout`, but **re-mounts** (new instance) on every navigation — use for animations or per-page effects     | Rare; prefer layout unless you specifically need remount behavior                                                                           |
+| `loading.tsx`      | Automatic `<Suspense>` boundary — shown while the segment (or any child page) streams                            | Wraps the whole segment tree; more granular control → use `<Suspense>` directly                                                             |
+| `error.tsx`        | Error boundary for a segment and its children; **must be `'use client'`**                                        | Receives `error` and `reset` props. Does NOT catch errors in the same segment's `layout.tsx` — add a `global-error.tsx` for the root layout |
+| `not-found.tsx`    | Rendered when `notFound()` is thrown anywhere in the segment tree                                                | Root `app/not-found.tsx` is the global 404                                                                                                  |
+| `default.tsx`      | Fallback for a parallel-route slot when no active match exists; **required in Next 16** (build fails without it) | See breaking-changes table §Parallel Routes                                                                                                 |
+| `forbidden.tsx`    | Custom 403 page; rendered when `forbidden()` is thrown                                                           | New in Next 15/16; requires `authInterrupts: true` in next.config                                                                           |
+| `unauthorized.tsx` | Custom 401 page; rendered when `unauthorized()` is thrown                                                        | Same; see below                                                                                                                             |
+| `route.ts`         | API endpoint; no UI                                                                                              | See Correct Signatures above                                                                                                                |
+
+```tsx
+// app/dashboard/error.tsx — MUST be 'use client'
+'use client';
+export default function DashboardError({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string };
+  reset: () => void;
+}) {
+  return (
+    <div>
+      <h2>Something went wrong</h2>
+      <button onClick={reset}>Try again</button>
+    </div>
+  );
+}
+```
+
+Source: `01-app/03-api-reference/03-file-conventions/`.
+
+---
+
+## `generateStaticParams` and `generateMetadata`
+
+### `generateStaticParams`
+
+Tells Next.js which dynamic route values to prerender at build time. Must return ≥ 1 param object when `cacheComponents: true` (returning `[]` errors — see breaking-changes table). With `cacheComponents` off, returning `[]` is fine.
+
+```tsx
+// app/blog/[slug]/page.tsx
+import type { Metadata } from 'next';
+
+export async function generateStaticParams() {
+  const posts = await getPosts();
+  return posts.map((p) => ({ slug: p.slug }));
+}
+```
+
+`dynamicParams` (segment config) controls what happens when a visitor requests a slug not in the list: `true` (default) renders it on demand; `false` returns 404.
+
+Source: `01-app/03-api-reference/04-functions/generate-static-params.md`.
+
+### `generateMetadata`
+
+```tsx
+// app/blog/[slug]/page.tsx
+import type { Metadata, ResolvingMetadata } from 'next';
+
+export async function generateMetadata(
+  { params }: { params: Promise<{ slug: string }> },
+  parent: ResolvingMetadata,
+): Promise<Metadata> {
+  const { slug } = await params; // params is a Promise in Next 16
+  const post = await getPost(slug);
+  const parentOpenGraph = (await parent).openGraph?.images ?? [];
+  return {
+    title: post.title,
+    description: post.excerpt,
+    openGraph: {
+      images: [post.coverImage, ...parentOpenGraph],
+    },
+  };
+}
+```
+
+- Return type is `Metadata | Promise<Metadata>`.
+- The `parent` argument is a `ResolvingMetadata` promise — `await` only the fields you actually need (avoids waterfall).
+- Static metadata: just `export const metadata: Metadata = { title: '…' }` — no function needed.
+- Both can coexist in the same tree at different segments; child metadata merges with (and overrides) parent.
+
+Source: `01-app/03-api-reference/04-functions/generate-metadata.md`.
+
+---
+
+## `after()` — run work after the response
+
+`after()` schedules a callback to run **after the response (or prerender) has finished** — logging, analytics, cleanup. The response is not delayed.
+
+```ts
+import { after } from 'next/server';
+
+// In a Server Component:
+export default async function Page() {
+  after(async () => {
+    await logPageView(); // runs after the page is streamed
+  });
+  return <h1>Hello</h1>;
+}
+
+// In a Route Handler:
+export async function POST(request: NextRequest) {
+  const body = await request.json();
+  after(async () => {
+    await saveAuditLog(body);
+  });
+  return Response.json({ ok: true });
+}
+
+// In a Server Action:
+'use server';
+export async function submitForm(formData: FormData) {
+  const result = await save(formData);
+  after(async () => {
+    revalidatePath('/dashboard'); // deferred revalidation
+  });
+  return result;
+}
+```
+
+- Available in Server Components, Route Handlers, Middleware/Proxy, Server Actions.
+- The callback receives no request/response context — capture what you need in closure.
+- Requires `experimental.after: true` in next.config **only if on Next 15**; it is **stable and on by default in Next 16** — no config needed.
+
+Source: `01-app/03-api-reference/04-functions/after.md`.
+
+---
+
+## `forbidden()` and `unauthorized()`
+
+Throw these like `notFound()` — they halt rendering and show the matching file-convention page with the correct HTTP status.
+
+```ts
+import { forbidden, unauthorized } from 'next/navigation';
+
+// In page.tsx or layout.tsx (Server Component):
+export default async function AdminPage() {
+  const session = await getSession();
+  if (!session) unauthorized();   // → app/unauthorized.tsx, HTTP 401
+  if (!session.isAdmin) forbidden(); // → app/forbidden.tsx, HTTP 403
+  return <AdminDashboard />;
+}
+```
+
+**Requires** `authInterrupts: true` in `next.config.ts`:
+
+```ts
+const nextConfig: NextConfig = {
+  experimental: { authInterrupts: true },
+};
+```
+
+Without the flag, the functions exist but are no-ops (they do not throw). Create `app/unauthorized.tsx` and `app/forbidden.tsx` to customise those pages; default fallbacks exist if you don't.
+
+Source: `01-app/03-api-reference/04-functions/forbidden.md`, `unauthorized.md`.
+
+---
+
 ## Common mistakes
 
 1. **Reading `params`/`searchParams` synchronously.** They're Promises and the Next 15 sync escape hatch is gone in 16. `await` them (or `use()` in a Client Component).
@@ -251,6 +416,10 @@ export default function Page() {
 12. **Assuming `unstable_cache`/`fetch` Data Cache semantics carry over to `use cache`.** They don't: `fetch`/`unstable_cache` persist across deployments and serverless instances; `use cache` is in-memory per-instance and per-deployment unless you use `'use cache: remote'` or a `cacheHandlers` entry.
 13. **`export const runtime = 'edge'` in a Cache Components app.** Not supported.
 14. **Assuming `revalidateTag` immediately regenerates pages.** With `'max'` it only marks tags stale; regeneration happens on the next visit.
+15. **Writing `error.tsx` as a Server Component.** It must be `'use client'` — error boundaries can only be class/client components in React. Omitting the directive is a runtime error.
+16. **Using `forbidden()` or `unauthorized()` without `experimental.authInterrupts: true`.** Without the config flag the functions are no-ops — no redirect, no error thrown, execution continues.
+17. **Adding `experimental.after: true` in Next 16.** `after()` is stable and on by default in Next 16 — the flag is a Next 15 artifact. Adding it to `next.config.ts` on Next 16 logs a deprecation warning.
+18. **Reading `params` synchronously in `generateMetadata`.** It is a Promise in Next 16 — `await params` before accessing fields, same as in `page.tsx` / `layout.tsx`.
 
 ---
 
@@ -264,6 +433,7 @@ Everything above is derived from `node_modules/next/dist/docs/`. Start points:
 - Directives: `01-app/03-api-reference/01-directives/` (`use-cache.md`, `use-cache-remote.md`, `use-cache-private.md`)
 - File conventions: `01-app/03-api-reference/03-file-conventions/` (`page.md`, `layout.md`, `route.md`, `proxy.md`, `default.md`)
 - Config keys: `01-app/03-api-reference/05-config/01-next-config-js/` — if a key isn't a file in there, it probably doesn't exist (note: **there is no `ppr.md`**).
-- Functions: `01-app/03-api-reference/04-functions/`
+- Functions: `01-app/03-api-reference/04-functions/` — including `after.md`, `forbidden.md`, `unauthorized.md`, `generate-metadata.md`, `generate-static-params.md`
+- File conventions: `01-app/03-api-reference/03-file-conventions/` — `error.md`, `loading.md`, `layout.md`, `not-found.md`, `default.md`, `forbidden.md`, `unauthorized.md`
 
 If a claim isn't covered here, read the doc rather than trusting recall.
