@@ -14,6 +14,17 @@ import { LogLevel, type Configuration } from '@azure/msal-browser';
  * `AuthProvider`'s effect where the error can be caught and rendered as a message.
  */
 
+/**
+ * Master switch for enforcement. Off by default so local development needs no Entra ID setup:
+ * the guard renders every page, the proxy waves requests through with a mock identity, and no
+ * sign-in ever fires. Set `NEXT_PUBLIC_AUTH_ENABLED=true` in the environments where real auth
+ * must run (production, and any staging you want locked down).
+ *
+ * It is `NEXT_PUBLIC_` so the same value is readable in the browser (guard, provider, fetch)
+ * and on the server (`proxy.ts`) — one flag, no client/server drift.
+ */
+export const AUTH_ENABLED = process.env.NEXT_PUBLIC_AUTH_ENABLED === 'true';
+
 function publicEnv(name: string): string | undefined {
   // Next inlines NEXT_PUBLIC_* at build time, so these must be referenced literally —
   // `process.env[name]` would return undefined in the browser bundle.

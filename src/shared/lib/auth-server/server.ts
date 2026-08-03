@@ -10,8 +10,23 @@ import { AuthError, verifyAzureToken, type AzureAdUser } from './verify-azure-to
  * off the hot path and keeps "is this request authenticated?" answerable in one place.
  */
 
-/** The header middleware uses to forward the verified identity. Never trust it from a client. */
+/** The header the proxy uses to forward the verified identity. Never trust it from a client. */
 export const AUTH_USER_HEADER = 'x-auth-user';
+
+/**
+ * The identity the proxy injects when enforcement is off (local development). It carries every
+ * app role so role-gated handlers also pass locally — the point of the local bypass is that
+ * nothing blocks you. Real environments never see this: with `NEXT_PUBLIC_AUTH_ENABLED=true`
+ * the proxy verifies a real token instead.
+ */
+export const DEV_AUTH_USER: AzureAdUser = {
+  userId: 'dev-user',
+  username: 'dev@localhost',
+  displayName: 'Local Dev User',
+  groups: [],
+  roles: ['admin', 'editor', 'viewer'],
+  scopes: [],
+};
 
 /**
  * Headers are ASCII-only by spec, and display names on this platform are frequently not

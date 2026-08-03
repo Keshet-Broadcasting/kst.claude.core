@@ -1,5 +1,18 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { AuthError, verifyAzureToken, AUTH_USER_HEADER, encodeUser } from '@/shared/lib/auth-server';
+import {
+  AuthError,
+  verifyAzureToken,
+  AUTH_USER_HEADER,
+  DEV_AUTH_USER,
+  encodeUser,
+} from '@/shared/lib/auth-server';
+
+/**
+ * Off by default so local development needs no Entra ID setup. When false, the gate below is
+ * skipped and a mock identity is injected instead — real verification runs only where
+ * `NEXT_PUBLIC_AUTH_ENABLED=true` (production, locked-down staging).
+ */
+const AUTH_ENABLED = process.env.NEXT_PUBLIC_AUTH_ENABLED === 'true';
 
 /**
  * The API gate (Next 16 renamed the `middleware` convention to `proxy` — same mechanism, runs
@@ -36,6 +49,16 @@ export async function proxy(request: NextRequest) {
   if (request.method === 'OPTIONS') return NextResponse.next();
 
   if (isPublic(request.nextUrl.pathname)) return NextResponse.next();
+
+  // Local development: no token check. Inject a mock identity so protected route handlers
+  // (which read it back via `getAuthUser`) still work without an Entra ID setup. Still delete
+  // any incoming header first — the injected identity must be the only one downstream sees.
+  if (!AUTH_ENABLED) {
+    const headers = new Headers(request.headers);
+    headers.delete(AUTH_USER_HEADER);
+    headers.set(AUTH_USER_HEADER, encodeUser(DEV_AUTH_USER));
+    return NextResponse.next({ request: { headers } });
+  }
 
   try {
     const user = await verifyAzureToken(request.headers.get('authorization'));

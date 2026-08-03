@@ -7,7 +7,7 @@ import {
   PublicClientApplication,
   type AuthenticationResult,
 } from '@azure/msal-browser';
-import { buildMsalConfig } from '@/shared/lib/auth-client';
+import { AUTH_ENABLED, buildMsalConfig } from '@/shared/lib/auth-client';
 
 /**
  * Boots MSAL and puts it in React context.
@@ -26,8 +26,12 @@ import { buildMsalConfig } from '@/shared/lib/auth-client';
  *
  * Setting the *active account* is on us either way: MSAL tracks accounts, but not which one
  * subsequent silent calls should use.
+ *
+ * When enforcement is off (local dev, `NEXT_PUBLIC_AUTH_ENABLED` unset) the public wrapper at
+ * the bottom of this file skips all of this and renders children directly — so local work
+ * needs no MSAL config and no sign-in.
  */
-export function AuthProvider({ children }: { children: ReactNode }) {
+function MsalAuthProvider({ children }: { children: ReactNode }) {
   const [instance, setInstance] = useState<PublicClientApplication | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -97,4 +101,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   if (!instance) return null;
 
   return <MsalProvider instance={instance}>{children}</MsalProvider>;
+}
+
+/**
+ * Public entry point. Enforcement off → render children with no MSAL at all (local dev).
+ * Enforcement on → boot MSAL via `MsalAuthProvider`. The branch is a component swap, not a
+ * conditional hook, so the MSAL hooks only ever run when they are actually needed.
+ */
+export function AuthProvider({ children }: { children: ReactNode }) {
+  if (!AUTH_ENABLED) return <>{children}</>;
+  return <MsalAuthProvider>{children}</MsalAuthProvider>;
 }

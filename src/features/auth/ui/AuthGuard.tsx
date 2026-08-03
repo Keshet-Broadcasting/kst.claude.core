@@ -3,7 +3,17 @@
 import { useEffect, type ReactNode } from 'react';
 import { useIsAuthenticated, useMsal } from '@azure/msal-react';
 import { InteractionStatus } from '@azure/msal-browser';
-import { LOGIN_SCOPES, hasAnyRole, type AppRole } from '@/shared/lib/auth-client';
+import { AUTH_ENABLED, LOGIN_SCOPES, hasAnyRole, type AppRole } from '@/shared/lib/auth-client';
+
+interface AuthGuardProps {
+  children: ReactNode;
+  /** Optional role requirement. Empty means "any signed-in user". */
+  roles?: readonly AppRole[];
+  /** Rendered while sign-in is in flight. A skeleton reads better than a blank screen. */
+  pending?: ReactNode;
+  /** Rendered when the user is signed in but lacks the role. */
+  forbidden?: ReactNode;
+}
 
 /**
  * The guard — the React answer to Angular's `canActivate: [MsalGuard]`.
@@ -15,21 +25,16 @@ import { LOGIN_SCOPES, hasAnyRole, type AppRole } from '@/shared/lib/auth-client
  * Wrap a whole area rather than each page. In the App Router the natural place is the layout of
  * a route group — `app/(protected)/layout.tsx` — which guards every route in the group with one
  * declaration and no per-page repetition.
+ *
+ * When enforcement is off (local dev) the public wrapper below renders children directly, so
+ * no sign-in ever fires and the MSAL hooks in `AuthGuardEnforced` never run.
  */
-export function AuthGuard({
+function AuthGuardEnforced({
   children,
   roles = [],
   pending = null,
   forbidden = <div role="alert">You don&apos;t have access to this page.</div>,
-}: {
-  children: ReactNode;
-  /** Optional role requirement. Empty means "any signed-in user". */
-  roles?: readonly AppRole[];
-  /** Rendered while sign-in is in flight. A skeleton reads better than a blank screen. */
-  pending?: ReactNode;
-  /** Rendered when the user is signed in but lacks the role. */
-  forbidden?: ReactNode;
-}) {
+}: AuthGuardProps) {
   const { instance, accounts, inProgress } = useMsal();
   const isAuthenticated = useIsAuthenticated();
 
@@ -55,4 +60,14 @@ export function AuthGuard({
   }
 
   return <>{children}</>;
+}
+
+/**
+ * Public guard. Enforcement off → render children directly (local dev, no sign-in).
+ * Enforcement on → delegate to `AuthGuardEnforced`. The swap keeps the MSAL hooks out of the
+ * render path entirely when auth is disabled.
+ */
+export function AuthGuard(props: AuthGuardProps) {
+  if (!AUTH_ENABLED) return <>{props.children}</>;
+  return <AuthGuardEnforced {...props} />;
 }

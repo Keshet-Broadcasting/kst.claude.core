@@ -3,7 +3,7 @@
 import { useCallback } from 'react';
 import { useMsal } from '@azure/msal-react';
 import { acquireAccessToken } from './acquire-token';
-import { getApiScopes } from './msal-config';
+import { AUTH_ENABLED, getApiScopes } from './msal-config';
 
 /**
  * The token-attaching `fetch`.
@@ -22,6 +22,10 @@ export function useApiFetch() {
 
   return useCallback(
     async (input: string | URL, init: RequestInit = {}): Promise<Response> => {
+      // Local dev: no MSAL, no token. The proxy injects a mock identity server-side, so a
+      // plain fetch reaches protected handlers just fine.
+      if (!AUTH_ENABLED) return fetch(input, init);
+
       const token = await acquireAccessToken(instance, getApiScopes());
 
       const headers = new Headers(init.headers);
