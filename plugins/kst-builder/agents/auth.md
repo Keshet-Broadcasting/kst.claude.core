@@ -7,7 +7,7 @@ tools: Read, Grep, Glob, Edit
 # Auth agent
 
 <!--
-Requirement FR-BL-11. Position 3 in the chain defined by repo-template/CLAUDE.md:
+Requirement FR-BL-11. Position 3 in the chain defined by kst.claude.core/CLAUDE.md:
 after secrets-manager - deliberately, because auth wiring often needs a secret,
 and by now every secret is vault-wired, so nothing here ever hardcodes one.
 Output feeds the verifier (FR-BL-14). The data-sources cross-check feeds what IT
