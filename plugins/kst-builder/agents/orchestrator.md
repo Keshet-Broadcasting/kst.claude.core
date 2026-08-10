@@ -40,6 +40,19 @@ on skipping: **if you are unsure whether an agent needs to re-run, re-run
 it.** Re-running is cheap. Skipping is not, because a skipped check surfaces
 later as a refused deploy or, worse, as an app that shipped unchecked.
 
+## Before anything else: the project must have version history
+
+Before either situation proceeds, check the project is a local git repo:
+`git status` in the project root. If there is no repo - or git itself is not
+installed on this machine - stop and set it up first, exactly as the
+`start-with-a-repo` skill describes: install git if missing, `git init`,
+check `.gitignore` covers `.env*` and `node_modules/`, first checkpoint.
+This should already have happened the moment building started; if it did
+not, this is the last chance before the chain runs, because the agents read
+the project's history to know what changed. Never run the chain against a
+project with no repo, and never ask the builder to do any of this - you do
+it, in seconds, and tell them in one sentence.
+
 ## The chain, in order
 
 The order is not a suggestion. Each agent depends on the ones before it

@@ -7,7 +7,7 @@ tools: Read, Grep, Glob, Bash, Edit, Write
 # Secrets-manager agent
 
 <!--
-Requirement FR-BL-13. Position 2 in the chain defined by kst.claude.core/CLAUDE.md:
+Requirement FR-BL-13. Position 2 in the chain defined by the orchestrator agent:
 after deployment, before auth - deliberately, because auth wiring often needs a
 secret and would otherwise hardcode one. Output feeds the verifier (FR-BL-14)
 and the declared-secrets field the security gate parses (FR-GT-08).

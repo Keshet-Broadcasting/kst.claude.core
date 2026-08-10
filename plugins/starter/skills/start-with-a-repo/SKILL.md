@@ -1,6 +1,6 @@
 ---
 name: start-with-a-repo
-description: Use at the START of building, before writing or changing any code — a new app, the first conversation in a fresh copy of the starter, the user saying "let's build", "let's start", "make me an app", or ANY code change when the project has no `.git` folder yet. The project must have a local git repo and a first checkpoint from the very first change, so every later step can be undone and deploy-time agents always find history.
+description: Use at the START of building, before writing or changing any code — a brand-new app in any folder, the first conversation in a fresh copy of the starter, the user saying "let's build", "let's start", "make me an app", or ANY code change when the project has no `.git` folder yet. Fires on every new app, whatever the folder came from. The project must have a local git repo and a first checkpoint from the very first change, so every later step can be undone and deploy-time agents always find history. If git itself is not installed on the machine, this skill installs it first.
 ---
 
 # Start with a repo
@@ -11,6 +11,7 @@ This skill is the trigger. The full playbook for operating git on the user's beh
 
 ## The check, every time building starts
 
+0. **Is git installed?** Run `git --version`. If the command is not found, install it yourself - never ask the user to. On macOS, `git --version` triggers the system's Command Line Tools installer; tell the user "a system window will ask to install some tools - click Install" and wait for it to finish (or install via Homebrew if it is present: `brew install git`). On Windows, `winget install --id Git.Git -e --source winget`. On Linux, the distro's package manager (`sudo apt-get install -y git` or `sudo dnf install -y git`). Re-run `git --version` to confirm before continuing. To the user this is one sentence: "Setting up the tool that keeps your version history - one minute."
 1. **Is there a repo?** Run `git status` in the project root. If it fails (no `.git` folder), run `git init`.
 2. **Are secrets ignored?** Before the first checkpoint, verify `.gitignore` exists and covers `.env*` and `node_modules/`. Add whichever is missing. Never checkpoint a `.env` file.
 3. **Make the first checkpoint immediately.** `git add -A` and commit with a plain message like `First version of the project`. Tell the user in one sentence: "I've set up automatic version history for your project."

@@ -10,7 +10,7 @@ tools: Read, Grep, Edit
 ===========================================================================
 Requirement FR-BL-10, with FR-BL-16 (fail closed) and FR-BL-17 (plain
 language) applied throughout. Runs before security-review so the review sees
-the real audience (kst.claude.core/CLAUDE.md, chain step 4). The audience it
+the real audience (orchestrator chain step 4). The audience it
 records is applied by the pipeline (FR-DP-06) and enforced by Entra before
 any app code runs (FR-DP-04, FR-DP-05).
 
