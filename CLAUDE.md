@@ -17,6 +17,10 @@ These are plugins from the official marketplace, so you don't need to wait for t
 Report the script's output. If it installed anything, tell the user to **restart Claude Code** so the new plugins load on the next session.
 <!-- END:plugin-bootstrap -->
 
+# Version history from the first moment
+
+The moment building starts, this project must be a local git repo. If there is no `.git` folder, run `git init` and make a first checkpoint before (or together with) the first code change - do not wait for a deploy, and do not wait to be asked. Before that first checkpoint, verify `.gitignore` covers `.env*` and `node_modules`, and add them if missing. From then on, checkpoint automatically after every verified piece of work, so there is always a version to go back to. This rule is unconditional; the `start-with-a-repo` and `git-for-humans` skills explain the how.
+
 # Commands
 
 This project uses **pnpm**. Real scripts live in `package.json`:
@@ -32,7 +36,9 @@ This project uses **pnpm**. Real scripts live in `package.json`:
 
 ## Definition of done
 
-Work is not complete until `pnpm typecheck && pnpm lint && pnpm build && pnpm test` all pass. Run them yourself and read the output before reporting done — never claim success on unverified work.
+For everyday changes: work is not complete until `pnpm typecheck && pnpm lint && pnpm build && pnpm test` all pass. Run them yourself and read the output before reporting done — never claim success on unverified work.
+
+When the app is being sent to Keshet, those four commands are a subordinate step, not the finish line. Work is not done until every required deploy agent has run and approved and the verifier has emitted its sign-off - see "Sending the app to Keshet" below. An agent that could not finish its check reports **not approved**. Fail closed, every time, including when it looks obviously fine.
 
 # Architecture
 
@@ -60,12 +66,37 @@ Rules:
 3. Verify the dev server starts: `pnpm dev`.
 4. If step 1 installed anything, tell the user to **restart Claude Code**.
 
+# Sending the app to Keshet
+
+This applies when the project is a Keshet builder app (the `kst-builder` plugin is installed). When the user says "deploy", "publish", "ship it", "put it live", or "share it with the team", the deploy chain runs - they never have to name an agent. Run the agents in this order. **The order is not a suggestion**: each one depends on the one before it having already changed the code.
+
+```
+1. deployment        prepare the app against the build contract, and collect
+                     the deployment request (purpose, data sources, audience)
+2. secrets-manager   find keys and tokens, take them out of the source, wire
+                     the app to read them from its own vault at runtime
+3. auth              make the app pass the end user's own sign-in through to
+                     every data source it touches
+4. access-manager    make them choose who may open the app. No default
+5. app-logging       add the logs, and check they will actually arrive
+6. security-review   read the whole result for leaked secrets and mistakes
+7. verifier          confirm every agent above ran and approved, then - and
+                     only then - send it
+```
+
+There is no `git push` to Keshet and there is no GitHub. **The push-broker is the only way code reaches Keshet**, it can refuse, and only the verifier may hand work to it. Read the `sharing-your-work` skill (from the plugin) before sending anything, and do not improvise refusal handling.
+
 # Hygiene
 
 - Never edit anything between the `nextjs-agent-rules` markers in `AGENTS.md` — `next dev` regenerates it.
 - Never commit `.env*` files (already gitignored — keep it so).
 - Never set `agentRules: false` in `next.config.ts`.
 - Never modify `.claude/settings.json` without an explicit user request.
+- Never put a secret in source - not in a config file, not in a comment, not "temporarily". The platform's gate scans for this server-side and will refuse the deploy.
+- Never log a secret, and never put one in an error message. Log that a connection succeeded, not what it connected with.
+- Never edit `azure-pipelines.yml` by hand. It is the app's only connection to the platform's security gate; editing it cannot weaken the gate - it can only stop the app deploying at all.
+- Never write a `Dockerfile` expecting it to be used. The platform supplies its own and ignores yours by design.
+- Never hand-edit the `Requester` or `Local agent sign-off` blocks in `DEPLOY_REQUEST.md`. Both are stamped, and both are re-checked server-side; a hand-edited one fails the gate rather than passing it.
 
 # Embeds — HARD RULE, no exceptions
 
@@ -98,3 +129,5 @@ Read the relevant skill before writing code in its domain.
 - `embeds` — `pnpm embed:add`, custom element lifecycle, `embed.json`.
 - `definition-of-done` — checklist before declaring work complete.
 - `env-vars` — `.env.local`, `NEXT_PUBLIC_`, zod validation.
+- `start-with-a-repo` - version history exists from the very first change; fires at the start of building.
+- `git-for-humans` - all version control, operated on the user's behalf in plain language.
