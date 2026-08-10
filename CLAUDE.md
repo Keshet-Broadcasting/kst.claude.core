@@ -19,7 +19,7 @@ Report the script's output. If it installed anything, tell the user to **restart
 
 # Version history from the first moment
 
-The moment building starts, this project must be a local git repo. If there is no `.git` folder, run `git init` and make a first checkpoint before (or together with) the first code change - do not wait for a deploy, and do not wait to be asked. Before that first checkpoint, verify `.gitignore` covers `.env*` and `node_modules`, and add them if missing. From then on, checkpoint automatically after every verified piece of work, so there is always a version to go back to. This rule is unconditional; the `start-with-a-repo` and `git-for-humans` skills explain the how.
+The moment building starts, this project must be a local git repo. If there is no `.git` folder, run `git init` and make a first checkpoint before (or together with) the first code change - do not wait for a deploy, and do not wait to be asked. Before that first checkpoint, verify `.gitignore` covers `.env*` and `node_modules`, and add them if missing. From then on, checkpoint automatically after every verified piece of work, so there is always a version to go back to. This rule is unconditional; the `start-with-a-repo` skill explains the how, and the `sharing-your-work` skill (from the kst-builder plugin) is the full playbook.
 
 # Commands
 
@@ -109,25 +109,22 @@ Steps, always in this order:
 
 Never skip step 1. Never create the folder by hand. Read the `embeds` skill before starting.
 
-# Skills (`.claude/skills/`)
+# Skills
 
-Read the relevant skill before writing code in its domain.
+The skills below ship in the `starter` and `kst-builder` plugins (installed by
+`node scripts/setup-plugins.mjs` per AGENTS.md). Read the relevant skill before
+writing code in its domain.
 
 - `nextjs-16` — App Router, caching, breaking changes vs 14/15.
 - `react-19` — hooks, Server Actions, transitions.
 - `routing` — pages, dynamic routes, route handlers.
-- `server-vs-client` — when to add `'use client'`, streaming.
 - `fsd` — FSD layers, where to put any new file, steiger errors.
 - `feature-workflow` — end-to-end checklist for a new feature.
 - `zustand-5` — store factory, provider pattern, selectors.
 - `state-management-guide` — decision tree for state placement.
-- `data-fetching` — RSC fetch, `use cache`, Suspense.
 - `css-modules` — design tokens, theming, dark mode.
-- `forms` — Server Actions, `useActionState`, zod, a11y.
-- `loading-and-error` — `loading.tsx`, `error.tsx`, Suspense.
-- `image-and-fonts` — `next/image`, `next/font`.
 - `embeds` — `pnpm embed:add`, custom element lifecycle, `embed.json`.
-- `definition-of-done` — checklist before declaring work complete.
-- `env-vars` — `.env.local`, `NEXT_PUBLIC_`, zod validation.
+- `definition-of-done` (kst-builder plugin) - what "done" means before reporting work complete, and before sending to Keshet.
+- `env-vars` — `.env.local`, `NEXT_PUBLIC_`, zod validation. For anything secret, the `secrets-in-your-app` skill from the kst-builder plugin wins.
 - `start-with-a-repo` - version history exists from the very first change; fires at the start of building.
-- `git-for-humans` - all version control, operated on the user's behalf in plain language.
+- `sharing-your-work` (kst-builder plugin) - all version control and sending to Keshet, operated on the user's behalf in plain language.

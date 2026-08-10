@@ -1,0 +1,20 @@
+{
+  "name": "kst",
+  "description": "Keshet plugins for building and deploying internal apps: the starter's framework skills and the kst-builder deploy layer.",
+  "owner": {
+    "name": "Keshet",
+    "email": "michael@bina-labs.com"
+  },
+  "plugins": [
+    {
+      "name": "starter",
+      "source": "./plugins/starter",
+      "description": "Framework and workflow skills for apps built from the kst.claude.core starter."
+    },
+    {
+      "name": "kst-builder",
+      "source": "./plugins/kst-builder",
+      "description": "Builder-facing agents and skills for deploying to the KST platform through the push-broker."
+    }
+  ]
+}

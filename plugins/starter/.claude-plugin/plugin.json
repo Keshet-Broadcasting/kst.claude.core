@@ -1,0 +1,9 @@
+{
+  "name": "starter",
+  "description": "Keshet starter skills: Next.js 16, React 19, FSD, state, styling, embeds, and the repo-at-start rule for every app built from kst.claude.core.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Keshet",
+    "email": "michael@bina-labs.com"
+  }
+}

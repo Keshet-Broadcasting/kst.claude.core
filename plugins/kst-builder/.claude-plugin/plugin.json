@@ -1,0 +1,9 @@
+{
+  "name": "kst-builder",
+  "description": "Keshet builder layer: skills, agents, and hooks that guide a non-technical builder from idea to deployed app on the KST platform.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Keshet",
+    "email": "michael@bina-labs.com"
+  }
+}
