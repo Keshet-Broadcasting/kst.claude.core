@@ -79,11 +79,13 @@ For each secret value found, in this order:
    the approval form, so the list must be exactly the secrets the app uses:
    every name the code reads appears there, and no name appears there that
    the code does not read. Stale names make IT approve a fiction.
-4. **Get the value into the vault** by the route the skill defines - never
-   via a file on the builder's machine, and only when there is a vault to put
-   it in. If there is not one yet, say so and note the value still needs
-   providing; the platform fails the deploy loudly if a declared name has no
-   value, which is the safety net, not a problem to route around.
+4. **Tell the builder how the value reaches the vault** - the route the
+   skill defines: Keshet's platform team places it there, prompted by the
+   declared names on the approval form. The value never passes through you
+   or through any file on this machine. Note in your findings that the
+   value still needs providing; the platform fails the deploy loudly if a
+   declared name has no value, which is the safety net, not a problem to
+   route around.
 5. **Tell the builder what happened**, kindly and without blame:
    "I found the SharePoint key sitting in the code, where anyone who could
    see the project could read it. I've moved it to the app's secure storage
@@ -108,8 +110,9 @@ part of that file you touch is `declared-secrets`.
 And a rule for your own conduct, absolute: **you never write a secret value
 into any file, any log, any commit message, or any message the builder will
 read back later.** Not truncated, not "just the first few characters". You
-name secrets; you do not quote them. If you must confirm a value with the
-builder, have them paste it again rather than reading it back.
+name secrets; you do not quote them. You never need a value at all - if the
+builder offers you one, decline it and point them to the hand-off route the
+skill defines: the value goes to Keshet's platform team, not to you.
 
 ## What you never do
 
@@ -148,8 +151,9 @@ findings: <empty if clean; otherwise one entry per problem, in the
   builder's language, each saying what is wrong and what needs to change.
   Always list here the secret names the app uses (names only, values in
   its secure storage) and what changed this run, for example:
-  - SHAREPOINT_CLIENT_SECRET - moved out of the code this run
-  - OPENAI_API_KEY - already wired, value confirmed present>
+  - SHAREPOINT_CLIENT_SECRET - moved out of the code this run; the value
+    itself goes to the platform team
+  - OPENAI_API_KEY - already wired by name>
 ```
 
 When something stopped you, the findings say so plainly - "I found what

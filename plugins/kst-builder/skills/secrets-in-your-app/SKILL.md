@@ -20,7 +20,13 @@ transfer verbatim, and the shape of the diagnosis flow at the end, which is the
 right shape for a builder-facing troubleshooting skill. Replaced entirely: the
 storage model.
 
-Requirements: FR-SK-01, FR-SK-03, FR-SK-04, FR-SK-06, FR-BL-13.
+Requirements: FR-SK-01, FR-SK-03, FR-SK-04, FR-SK-06, FR-SK-12, FR-BL-13.
+
+Value hand-off (FR-SK-12, D-25): builder-supplied values are placed in the
+vault out of band by Keshet's platform team or IT, prompted by the declared
+names they see on the approval form. The builder's machine has no route to
+the vault, and builder self-service for values is explicitly out of scope.
+Nothing in this skill may instruct the agent to collect or place a value.
 ===========================================================================
 -->
 
@@ -57,10 +63,12 @@ next to a name, that value is a secret and belongs in the vault.
 3. **Read it in the code the ordinary way** for the language, as if it were an
    environment variable. The platform wires the name to the vault at deploy
    time, so it arrives under the name you declared.
-4. **Ask the builder for the value once**, and put it straight into the vault -
-   never into a file on their machine on the way there. If the vault does not
-   exist yet because the app has not been deployed, tell them that, and take the
-   value only when there is somewhere to put it.
+4. **Never take the value yourself.** The value goes into the vault by
+   Keshet's platform team, who are prompted by the declared names on the
+   approval form when the app is sent. Tell the builder that: they hand the
+   value to the platform team through Keshet's usual channel - never to you,
+   never into the code, never into a file on their machine. There is nothing
+   for them to set up and nowhere on this machine the value belongs.
 
 If you find a secret already sitting in the code - which happens, and is not
 something to make the builder feel bad about - take it out, replace it with the
@@ -78,7 +86,7 @@ project could read it."
   A name that has no value in the vault fails the deploy rather than producing
   an app that breaks the first time someone uses it.
 
-That last one is why declaring a secret you have not yet put in the vault is
+That last one is why declaring a secret whose value is not in the vault yet is
 safe: it fails loudly, at deploy time, with a message naming the secret.
 
 ## Security rules - these do not bend
@@ -120,10 +128,11 @@ Work down this list. Most of the time it is 1 or 2.
    the three produces exactly this symptom. Compare all three, character by
    character.
 
-3. **Is there a value in the vault, and is it right?** Copy-paste damage is
-   common - a trailing space, a line break, a smart quote where a straight one
-   should be. Have the builder paste it again rather than reading it back to
-   you.
+3. **Is there a value in the vault, and is it right?** The platform team put
+   it there, and copy-paste damage is common - a trailing space, a line break,
+   a smart quote where a straight one should be. The fix is the builder
+   supplying the value to the platform team again, freshly pasted - not to
+   you, and never read back aloud to compare.
 
 4. **Is the app allowed to read its vault?** If the app's permission on its own
    vault was never granted, every secret fails at once rather than one of them.
