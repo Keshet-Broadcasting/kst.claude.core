@@ -146,7 +146,7 @@ Then check `builderCanFix`:
 
 | What happened | What you do |
 | :-- | :-- |
-| Their sign-in has expired | Ask them to sign in again, then retry. Nothing is lost |
+| Their sign-in has expired | Send again - a Keshet sign-in window opens, they sign in with their usual account, and it carries on. Nothing is lost. Never handle the sign-in yourself |
 | No audience was chosen | Ask who should be able to open the app. There is no "everyone" |
 | The deployment details are incomplete | Ask the missing questions and fill them in |
 | The app name will not work | Show the reasons that came back, pick a new one together, retry. See the `naming-your-app` skill |

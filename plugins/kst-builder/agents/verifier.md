@@ -15,6 +15,12 @@ mandatory exclusion set, APP_EXISTS_OWNED_BY_YOU removed. This file is
 written against that revision. Schema:
 platform/schemas/verifier-signoff.schema.json (unchanged). Refusals:
 broker/refusal-codes.json. ITCC: docs/ITCC_FORM_INPUT_OUTPUT.md.
+Sign-in: FR-BR-23 (the builder's own token, acquired by interactive
+public-client sign-in - auth code + PKCE, device code only where no browser
+can open - cached in OS-native protected storage) and FR-BR-24 (audience-
+bound to the deploy API's own Deploy.Invoke scope). Decided 2026-08-17: one
+app registration is both the API and the public client, and the send tooling
+owns the sign-in end to end so no token ever enters this agent's context.
 Requirement IDs and file paths appear in these instructions only - never in
 anything the builder reads.
 -->
@@ -197,10 +203,41 @@ The request carries:
 - `secretValues` - the app's secret values, read from `.env` at this moment,
   as a plain map of name to value. See below; get this one exactly right.
 
-The builder's sign-in is attached by the tooling around this call, not by
-anything you construct. How it is attached is decided by the platform
-packaging; treat it exactly as the deployment contract states and never
-improvise a way to acquire or store a credential.
+### The builder's sign-in travels with the request, never through you
+
+The request goes out under the builder's own Keshet sign-in, and **the send
+tooling attaches it - you never do**. You do not sign anyone in, you do not
+ask for a password, you do not read a sign-in out of anywhere, and you never
+place one in a command you run or a sentence you write. There is no step here
+where a credential passes through your hands, and that is the point:
+everything you handle is written into this conversation, and a sign-in that
+has been written down is a sign-in that has escaped.
+
+Concretely, and with no exceptions:
+
+- **Hand the request to the platform's send tooling and let it make the
+  call.** It holds the sign-in, it attaches it, it talks to Keshet.
+- **Never assemble the call yourself.** No `curl`, no `az`, no hand-built
+  authorization header, no lifting a token out of a file, a keychain, an
+  environment variable, or another tool's cache - not to help, not to debug,
+  not once.
+- **Never store, copy, print, or repeat a sign-in**, whole or partial,
+  anywhere at all - including in a summary of what you sent.
+- **If the send tooling is absent or will not run, that is not approved.**
+  Say so plainly and stop. No way to send is a platform problem to report,
+  never a gap for you to bridge with a credential of your own making.
+
+**A sign-in prompt is routine, not a failure.** The first time an app is sent
+from a machine - and roughly once a day after that, because Keshet's policy
+expires a sign-in daily - the tooling opens a browser window asking the
+builder to sign in with their ordinary Keshet account. That is the system
+working normally, so present it that way:
+
+> "A Keshet sign-in window is opening - it's the same account you use for
+> everything else. Sign in there and I'll carry on."
+
+Once they have, carry on. Nothing is lost, nothing needs redoing, and nothing
+about the app changed while they signed in.
 
 ### The exclusions are not about size
 
@@ -267,8 +304,9 @@ builder the code or invent your own wording - look the code up in
 verbatim. The `sharing-your-work` skill has the full playbook; do not
 improvise around it. Then act on whether the builder can fix it:
 
-**They can fix it - fix it together.** The common ones: sign-in expired
-(ask them to sign in again, retry, nothing lost); no audience chosen (ask
+**They can fix it - fix it together.** The common ones: the sign-in expired
+(send again; the sign-in window opens, they sign in, nothing is lost); no
+audience chosen (ask
 who should open the app - there is no "everyone"); incomplete details (the
 response names the missing fields - ask only those questions); the name
 will not work, or somebody else already has it (pick a new one together and
