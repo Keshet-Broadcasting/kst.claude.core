@@ -73,18 +73,21 @@ This applies when the project is a Keshet builder app (the `kst-builder` plugin 
 ```
 1. deployment        prepare the app against the build contract, and collect
                      the deployment request (purpose, data sources, audience)
-2. secrets-manager   find keys and tokens, take them out of the source, wire
-                     the app to read them from its own vault at runtime
+2. secrets-manager   find keys and tokens, take them out of the source, and put
+                     them in the app's gitignored .env under declared names
 3. auth              make the app pass the end user's own sign-in through to
                      every data source it touches
 4. access-manager    make them choose who may open the app. No default
 5. app-logging       add the logs, and check they will actually arrive
 6. security-review   read the whole result for leaked secrets and mistakes
-7. verifier          confirm every agent above ran and approved, then - and
+7. create-repo       agree the app's name with the user and record it
+8. verifier          confirm every agent above ran and approved, then - and
                      only then - send it
 ```
 
-There is no `git push` to Keshet and there is no GitHub. **The push-broker is the only way code reaches Keshet**, it can refuse, and only the verifier may hand work to it. Read the `sharing-your-work` skill (from the plugin) before sending anything, and do not improvise refusal handling.
+There is no `git push` to Keshet and there is no GitHub. **The deployment service is the only way code reaches Keshet**, it can refuse, and only the verifier may hand work to it. Read the `sharing-your-work` skill (from the plugin) before sending anything, and do not improvise refusal handling.
+
+**Never work out for yourself whether this is the app's first send or a later one.** There is one send, and Keshet decides which it is - this machine cannot know, because a fresh clone has no memory of an earlier deploy. There is also nothing to ask: no name check, no availability lookup. A name that cannot work comes back refused, with nothing created, and the user picks another.
 
 # Hygiene
 
@@ -92,11 +95,11 @@ There is no `git push` to Keshet and there is no GitHub. **The push-broker is th
 - Never commit `.env*` files (already gitignored — keep it so).
 - Never set `agentRules: false` in `next.config.ts`.
 - Never modify `.claude/settings.json` without an explicit user request.
-- Never put a secret in source - not in a config file, not in a comment, not "temporarily". The platform's gate scans for this server-side and will refuse the deploy.
+- Never put a secret in source - not in a config file, not in a comment, not "temporarily". The platform's gate scans for this server-side and will refuse the deploy. Secret values belong in the gitignored `.env` and nowhere else; the app reads them as ordinary environment variables, the same locally and in production. The `secrets-in-your-app` skill is the authority on this.
 - Never log a secret, and never put one in an error message. Log that a connection succeeded, not what it connected with.
 - Never edit `azure-pipelines.yml` by hand. It is the app's only connection to the platform's security gate; editing it cannot weaken the gate - it can only stop the app deploying at all.
 - Never write a `Dockerfile` expecting it to be used. The platform supplies its own and ignores yours by design.
-- Never hand-edit the `Requester` or `Local agent sign-off` blocks in `DEPLOY_REQUEST.md`. Both are stamped, and both are re-checked server-side; a hand-edited one fails the gate rather than passing it.
+- Never hand-edit the `Requester` or `Local agent sign-off` blocks in `DEPLOY_REQUEST.md`. Both are stamped, and both are re-checked server-side. The `Requester` block is more than a record: it is how Keshet recognises, on every later send, that this app belongs to this user - so editing it can cost them ownership of their own app, not merely fail a check.
 
 # Embeds — HARD RULE, no exceptions
 

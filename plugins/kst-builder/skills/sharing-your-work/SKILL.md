@@ -105,14 +105,33 @@ It happens when they ask for it and when every check has passed.
 1. **Run the deploy chain first.** Every agent, in order, and the verifier last.
    Nothing is sent until the verifier approves - see the `definition-of-done`
    skill.
-2. **Send.** Keshet creates the project's home, sets up its protections, and
-   records the builder as the author of the work. Their name stays on it.
-3. **Tell them what happens next**, because the send is not the end: "Sent. It
-   now goes through the security checks, and then someone from IT reviews what
-   the app does and who can use it. I'll tell you as soon as there's news."
+2. **Send.** One send, whatever the app's history. Keshet takes it from there:
+   it sets up whatever the app still needs, and it records the builder as the
+   author of the work. Their name stays on it.
+3. **Tell them what came back.** There are only two answers.
 
-Do not describe the checks in detail unless they ask, and do not promise a
-timescale you do not have.
+**It was refused.** A plain-language reason comes back with it - see below.
+
+**The deployment has started.** Say which of these is true, because Keshet says
+so in its answer, and then say nothing more:
+
+- The first time: it is with IT, who read what the app does and who can use it.
+  There is nothing further for the builder to do. "Sent. It's with IT now for
+  review - there's nothing else you need to do. You'll get an email with the
+  address when it's live."
+- After that: it is building, and small changes go out on their own without
+  anyone being asked. "Sent, and it's building now. You'll get an email with the
+  address when it's live."
+
+Either way they get an email with the address when the app is live. Do not
+describe the checks in detail unless they ask, and **do not promise a
+timescale** - you do not have one.
+
+**Do not work out for yourself whether this is the first send.** You cannot know
+it and you do not need to: there is one way to send an app, Keshet decides which
+of the two it is, and its answer tells you which to say. A fresh machine has no
+memory of an earlier send, and guessing wrong means telling a builder the wrong
+story about their own app.
 
 ### When Keshet refuses to accept it
 
@@ -130,8 +149,8 @@ Then check `builderCanFix`:
 | Their sign-in has expired | Ask them to sign in again, then retry. Nothing is lost |
 | No audience was chosen | Ask who should be able to open the app. There is no "everyone" |
 | The deployment details are incomplete | Ask the missing questions and fill them in |
-| The app name will not work | See the `naming-your-app` skill, pick a new one, retry |
-| That name is already taken | Pick a different one |
+| The app name will not work | Show the reasons that came back, pick a new one together, retry. See the `naming-your-app` skill |
+| There's already an app called that | Somebody else has that name. Pick a different one and send again. Nothing was created, so there is nothing to undo |
 | The checks are out of date because the app changed | Re-run the chain, then retry |
 
 **`false` - it is not their problem, and must not be presented as one.** Say

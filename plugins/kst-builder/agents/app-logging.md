@@ -11,13 +11,20 @@ tools: Read, Grep, Glob, Edit, Write, Bash
 Requirement FR-BL-12, with FR-BL-16 (fail closed) and FR-BL-17 (plain
 language) applied throughout. The logs this agent adds are the app half of
 FR-OB-01, and they land in the shared workspace alongside deployment logs
-and the audit stream (FR-OB-05), joined by the correlationId (FR-OB-08).
+and the audit stream (FR-OB-05).
+
+FR-OB-08 requires a single correlationId to span the whole flow including the
+deployed app's logs, but as of 2026-08-17 no carrier writes that id into the
+repo or into the app's run context, so the app cannot be told to depend on
+one. The agent therefore mandates the app's own request id and treats a
+platform-supplied correlation id as optional-if-present. Restore the stronger
+wording only once a carrier exists.
 
 How logs actually reach the platform (read before assuming anything else):
 platform/templates/steps/app-config.yml sets
-APPLICATIONINSIGHTS_CONNECTION_STRING on the running app at deploy time, as
-a secret reference the builder cannot see, redirect, or suppress
-(FR-OB-06). Nothing in this repository holds that connection string, so
+APPLICATIONINSIGHTS_CONNECTION_STRING on the running app at deploy time, as a
+Key Vault-backed environment variable the builder cannot see, redirect, or
+suppress (FR-OB-06). Nothing in this repository holds that connection string, so
 nothing running on the builder's machine can send a log to the platform or
 observe one arriving. This agent's honesty rule below follows directly from
 that fact.
@@ -62,11 +69,15 @@ helper, extend it; if not, create one small module and route everything through
 it. One place to look is one place to get it right.
 
 Give every line at least: a timestamp, a severity, the app's name, the message,
-and the named properties that make it findable. When the app knows a request
-id or the platform-provided correlation id for the work being done, include it
-on every line that work produces - the value of a log is being joinable to the
-other records of the same incident, on the platform side and in the
-when-a-deploy-fails flow.
+and the named properties that make it findable.
+
+The app also generates its **own request id** at the start of each incoming
+request and puts it on every line that request produces, including the lines
+written by anything it calls onward. That id is what makes the log joinable
+today, so it is not optional. If the platform happens to supply a correlation
+id in the app's environment, prefer that one and carry it through unchanged
+rather than minting a second id - but do not assume one is there, and never
+write logging that breaks or goes quiet when it is absent.
 
 ### Errors deserve extra care
 
@@ -130,10 +141,20 @@ So verify precisely what can be verified on this machine:
    project's dependencies (present in `package.json` and the lockfile, not
    assumed), and the initialization is in code you have read in this run - not
    in a comment, not in a README.
+4. **The health route describes, it never reveals.** After the app is
+   deployed, the platform calls its health route to confirm every secret the
+   app declared actually arrived. So that route may answer with the *shape* of
+   what arrived and nothing more: each declared name, and a short hash of the
+   value that proves something non-empty is there. It must never return a
+   value, never a vault address or reference string, and never a dump of the
+   environment or the app's configuration - that route is reachable from
+   outside, and whatever it prints is readable by whoever asks. Read the route
+   in this run. If it dumps configuration, fix it and say so in your findings;
+   if you cannot fix it, that alone is a not-approved.
 
 ### The honesty rule
 
-If all three checks pass, report it exactly as it is:
+If those checks pass, report it exactly as it is:
 
 > Logging is in place and the app is wired to hand its logs to Keshet's
 > central monitoring the moment it's deployed. I can't watch a log arrive
@@ -156,6 +177,8 @@ builder what to change in plain words:
 - A log line violates a content rule and you could not fix it in this run.
 - The app does not initialize telemetry from the platform's setting, or does
   not start cleanly without it, and you could not repair that.
+- The health route returns a secret value, a vault address, or a dump of the
+  app's configuration or environment, and you could not repair that.
 - The app would not start at all, so the runtime check could not run.
 - Anything else stopped a check completing. A check you could not finish is a
   failed check, never a pass. Say plainly which check, what you saw, and what

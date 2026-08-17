@@ -51,19 +51,24 @@ Sent  →  Security checks  →  IT review  →  Deploy  →  Live
 "It got through the security checks and it's waiting for IT to review it" is a
 complete answer to "what's happening", and most of the time it is the true one.
 
+The IT review step is not always there. The first time an app is sent, a person
+reads it before anything runs. After that, small changes go out on their own,
+and only a big one is put in front of a person again. **Do not work this out for
+yourself** - it is not yours to decide and you cannot see it from here. Say
+where the app actually is, which is what Keshet tells you.
+
 ## The security checks failed
 
 These run before IT sees anything, deliberately - so IT is never asked to review
 something that was going to fail anyway.
 
-**A secret was found in the code.** Take it out, declare its name, and tell
-the builder the value itself goes to Keshet's platform team, who place it in
-the app's secure storage (see `secrets-in-your-app`) - then re-run the checks
-and send again. Say it plainly and without alarm: "There's a password saved
-in the code. I've taken it out; the key itself needs to be handed to the
-platform team, and then I'll send the app again." If it was ever sent
-anywhere, it must be replaced rather than merely moved - a secret that has
-left the machine is a secret that has to be changed.
+**A secret was found in the code.** Take it out and move it where secrets
+belong - the `secrets-in-your-app` skill is the authority on that, and this
+skill does not restate it. Then re-run the checks and send again. Say it plainly
+and without alarm: "There's a password saved in the code. I've moved it
+somewhere safe, and I'll send the app again." If it was ever sent anywhere, it
+must be replaced rather than merely moved - a secret that has left the machine
+is a secret that has to be changed.
 
 **A security problem was found in the code or in something it depends on.** Read
 what was flagged. Usually it is a component that needs updating, which you can

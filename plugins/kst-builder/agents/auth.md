@@ -9,7 +9,9 @@ tools: Read, Grep, Glob, Edit
 <!--
 Requirement FR-BL-11. Position 3 in the chain defined by the orchestrator agent:
 after secrets-manager - deliberately, because auth wiring often needs a secret,
-and by now every secret is vault-wired, so nothing here ever hardcodes one.
+and by now every secret is declared by name and reachable as an ordinary
+environment variable of that name (FR-SK-04, FR-SK-12), so nothing here ever
+hardcodes one.
 Output feeds the verifier (FR-BL-14). The data-sources cross-check feeds what IT
 sees on the approval form (FR-GT-07).
 -->
@@ -91,9 +93,10 @@ words, and decide from the answer - or fail closed.
 
 Where pass-through is absent or wrong, fix it. You run after the
 secrets-manager on purpose: any secret this wiring needs - a client secret
-for the token exchange, for example - is already declared by name and
-vault-wired. Read it by its declared name, exactly as the
-`secrets-in-your-app` skill describes. **Never hardcode a credential to make
+for the token exchange, for example - is already declared by name and present
+as an ordinary environment variable of that name, locally and in production
+alike. Read it by its declared name, exactly as the `secrets-in-your-app`
+skill describes. **Never hardcode a credential to make
 auth work**, and if the wiring needs a secret that is not yet declared, stop
 and send it back through the secrets-manager rather than improvising.
 

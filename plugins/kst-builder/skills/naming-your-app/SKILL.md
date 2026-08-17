@@ -1,6 +1,6 @@
 ---
 name: naming-your-app
-description: Use whenever the app is being named or renamed - at the start of a new app, when the user says "call it X", or when a name has been refused. Also use before sending an app to Keshet for the first time, because a name that will not work must be caught while changing it is still free.
+description: Use whenever the app is being named or renamed - at the start of a new app, when the user says "call it X", or when a name has come back refused. Also use before sending an app to Keshet for the first time, because the name is agreed with the builder before anything is sent.
 ---
 
 # Naming the app
@@ -11,57 +11,69 @@ Replaces the naming half of kst.claude.core's `naming-conventions` skill for
 platform purposes (core gap analysis §7.8).
 
 That skill is 345 lines on naming files, components, and CSS classes - style,
-not enforcement, and none of it fails anything. The platform's naming rules are
-not stylistic: the app name becomes an Azure resource name, and a name that
-does not fit is refused. A builder who learns that after IT has already approved
-their app has wasted IT's time and their own.
+not enforcement, and none of it fails anything. The app name is different: it
+becomes an Azure resource name, and Keshet is the one that decides whether it
+works.
 
-The rule itself lives in platform/scripts/appname.py and nowhere else. Do not
-restate it in code here - run it.
+Rewritten 2026-08-17. Two things changed and both remove work from here:
 
-Requirements: FR-BL-19, FR-BR-11, FR-SK-01, FR-SK-02.
+1. There is no name-checking operation at Keshet, and there is no local
+   validator either. This skill ships no script and a builder machine has no
+   platform repo, so any instruction to run one was never runnable where this
+   skill actually lands. Naming is a conversation: propose, and let the builder
+   approve, ask for another, or supply their own.
+2. The builder's own existing app is not a refusal. A name coming back taken
+   means somebody else has it, and nothing else.
+
+kst.auth.api is the naming authority. platform/scripts/appname.py is a
+platform-side helper, is not shipped to builders, and is not authoritative.
+
+Requirements: FR-BL-19, FR-BR-11, FR-BR-26, FR-SK-01, FR-SK-02.
 ===========================================================================
 -->
 
-## Check the name before doing anything with it
+## Agree the name with the builder
 
-Run the platform's own validator rather than judging by eye:
+There is nothing to run and nothing to look up. The name is settled between you
+and the builder, in one exchange:
 
-```
-python3 platform/scripts/appname.py check <name>
-```
+**Propose a name**, and let them approve it, ask for a different one, or give
+you their own. That is the whole task. Do not check it against a list of rules
+as though you were the one deciding - you are not, and pretending otherwise
+means telling a builder their name is fine and then having Keshet say
+otherwise, or the reverse.
 
-If it exits non-zero, show the builder the reasons it printed **verbatim** -
-they are already written for them. Do not paraphrase, and do not add a rule of
-your own on top.
+Keshet decides when the app is sent. If the name cannot work, the send comes
+back refused with Keshet's own reasons, **nothing has been created**, and the
+builder simply picks again. One round trip, nothing to undo.
 
-Do this **before** the app is sent, not as part of sending it. Keshet checks the
-name too and will refuse a bad one, but by then the builder has waited for a
-round trip to find out something we could have told them instantly.
+## What makes a good name
 
-## The rules, in the terms someone picks a name in
+Guidance for the name you propose, and for helping a builder pick one. Not
+rules you enforce, and never a checklist you read out:
 
-- **Lowercase letters, numbers, and hyphens between words.** `sales-report`,
+- **Short, lowercase, words separated by hyphens.** `sales-report`,
   `team-rota`, `leave-requests`.
-- **Start with a letter.**
-- **No spaces, capitals, underscores, or accented characters.** Hebrew names do
-  not work here - this is a system name, not a title. The app can display any
-  title they like; this is the name underneath.
-- **Up to 20 characters.** `quarterly-sales-report` is too long;
-  `sales-report` is not.
-- **Short and specific beats long and complete.** This name will appear in lists
-  next to every other app at Keshet. `report` tells nobody anything;
+- **No dots or underscores.** No spaces, and no accented characters. Hebrew
+  names do not work here - this is the name underneath, not the title. The app
+  can display any title they like.
+- **Memorable, because it becomes the app's web address.** People will type it
+  and send it to each other.
+- **Short and specific beats long and complete.** This name sits in a list next
+  to every other app at Keshet. `report` tells nobody anything;
   `newsroom-rota` tells them everything.
 
 ## How to have the conversation
 
 They will offer a title, not a name: "the quarterly sales dashboard for the
-commercial team". Do not refuse it - propose the name and check:
+commercial team". Do not refuse it - propose a name from it and let them say:
 
-> "I'll call it `sales-dashboard` underneath - that's the name Keshet's systems
-> use. What people see when they open it can be anything you like."
+> "I'll call it `sales-dashboard` underneath - that's the name Keshet uses, and
+> it's what people will see in the app's web address. What they see when they
+> open it can be anything you like. Happy with that, or would you rather call
+> it something else?"
 
-Then run the validator and, if it passes, move on. This should take one exchange.
+Then take their answer and move on. This should take one exchange.
 
 ## Renaming later
 
@@ -81,26 +93,29 @@ Before the app has been sent, renaming costs nothing. Say yes freely.
 
 Two different refusals, and the difference matters to the builder:
 
-- **The name will not work** - it broke one of the rules above. The reasons come
-  back with the refusal; show them, pick a new name together, retry.
-- **The name is already taken** - the name is fine, someone else has it. Do not
-  show them the rules; that would suggest they did something wrong. "There's
-  already an app called that at Keshet. What else could we call it?"
+- **The name will not work.** Keshet's reasons come back with the refusal - show
+  them as they are written, pick a new name together, send again.
+- **There's already an app called that.** Somebody else has that name. Do not
+  show them any rules; they did nothing wrong. "There's already an app called
+  that at Keshet. What else could we call it?"
+
+Nothing was created in either case, so there is nothing to clean up.
 
 There is a third, rarer one: an app of that name existed before and was removed,
 and the name is not free yet. That one is not theirs to fix. Say so, say the
 platform team has been told, and offer to pick a different name now rather than
 wait.
 
+**A builder sending their own app again is not a refusal at all.** It is simply
+the next version of that app, and it goes through. Nobody is asked anything, and
+you should not raise it.
+
 ## What the name becomes
 
 Not something to explain unless asked, but worth knowing so you can answer if
-they see it somewhere:
+they see it somewhere.
 
-```
-python3 platform/scripts/appname.py derive sales-report
-```
-
-The app's home, its address, and its key store are all named from it. The key
+Keshet builds everything else from the one name the builder approved: the app's
+home, its web address, its key store, and its sign-in registration. The key
 store's name has a string of letters and numbers on the end - that is
 deliberate, so that no two apps anywhere can end up sharing one.
