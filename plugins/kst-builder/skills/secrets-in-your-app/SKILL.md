@@ -34,6 +34,12 @@ now:
 - `.env` is in the mandatory exclusion set (FR-BR-22): out of the pushed tree
   and out of the treeDigest. Values travel in the deploy request's own
   `secretValues` field (name -> value), never inside `files`.
+- **The send tooling reads `.env` and fills that field itself** (2026-08-17).
+  No agent reads a value to send it, exactly as no agent handles the builder's
+  sign-in: an agent's inputs are written into its transcript, so a value that
+  passes through one has left the machine by a second route. Agents work in
+  names - they reconcile `declared-secrets` against the KEYS of `.env` and
+  never open the file.
 - kst.auth.api writes each value into the app's own Key Vault as a one-way
   conduit: set, never get; never stored outside the vault, never logged, never
   echoed in a refusal (FR-SK-12, FR-SK-08).

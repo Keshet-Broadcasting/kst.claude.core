@@ -92,11 +92,19 @@ Before anything is sent, check every one of these is present and real:
 - **Declared secret names** - every secret the app needs, by name. Names
   only, never values. If the app uses a key that is not declared, that is a
   secrets-manager failure and goes back to the orchestrator. Each declared
-  name must also have a value waiting in the app's `.env`, because that is
-  where the value travels from at send time (step 5). A declared name with
-  no value there is caught here, while it is a question; left alone it
-  becomes an app that builds and then breaks the first time someone opens
-  it.
+  name must also have an entry waiting in the app's `.env`, because that is
+  where the value travels from at send time (step 5). Check that by reading
+  the **keys** of `.env` and nothing else:
+
+  ```
+  grep -oE '^[A-Za-z_][A-Za-z0-9_]*=' .env | tr -d '='
+  ```
+
+  That prints names and never a value, which is the only way you may look
+  inside that file. Never open `.env` itself, and never run anything that
+  would print a line of it. A declared name with no key there is caught
+  here, while it is still a question; left alone it becomes an app that
+  builds and then breaks the first time someone opens it.
 - **Description and tags** - the catalogue entry IT registers the app
   under, in the file's `description` and `tags` fields like everything
   else here. The deployment agent writes them during its interview. A
@@ -200,8 +208,9 @@ The request carries:
   decoded in total and at most 2000 files after exclusions - a normal app
   sits far under both, so approaching them means something was swept in
   that should not be sent.
-- `secretValues` - the app's secret values, read from `.env` at this moment,
-  as a plain map of name to value. See below; get this one exactly right.
+- `secretValues` - the app's secret values, as a map of name to value. **The
+  send tooling reads these out of `.env` itself, at the moment it sends. You
+  do not read them, assemble them, or pass them on.** See below.
 
 ### The builder's sign-in travels with the request, never through you
 
@@ -260,22 +269,33 @@ be in the repository, and no later fix removes it from the history.
 ### `secretValues` - the one way a secret value travels
 
 The values still have to get to Keshet, or the app cannot run. They travel
-in their own field, beside the tree and never inside it:
+in their own field, beside the tree and never inside it - and they travel the
+same way the sign-in does, which is to say **without passing through you**:
 
-- **Read them from `.env` at send time**, one entry per key.
-- **Every key here must be one of the declared secret names** you checked in
-  step 2. A value with no matching declared name is refused, and a declared
-  name with no value here builds an app that fails the moment it runs - so
-  reconcile the two lists before you send, not after.
+- **The send tooling reads `.env` at send time and fills this field.** You
+  never read a value, never hold one, never hand one over. The reason is the
+  reason from the sign-in: what you handle is written into this conversation,
+  and a secret written down is a secret leaked - to the transcript, to
+  whatever stores it, and to anyone who reads it later. Keeping the values in
+  the file until the moment they leave the machine is what keeps them out of
+  all three.
+- **What is yours is the reconciliation, and it is names only.** Every
+  declared name has a key in `.env`, and every key in `.env` is a declared
+  name - checked with the keys-only command in step 2. A value with no
+  matching declared name is refused at Keshet, and a declared name with no
+  key builds an app that fails the moment it runs, so settle both before you
+  send rather than after.
 - **An app with no secrets sends nothing here**, or an empty map. Neither is
   a problem.
 - **The values are written once and never read back.** Keshet puts each one
   into the app's own locked store; nothing and nobody reads it out again,
   and it never comes back in an answer of any kind.
-- **You never repeat a value.** Not to the builder, not in a message, not in
-  a summary of what you sent, not in a log line, not in a findings entry,
-  not even partially. You may say a secret is set, or name it. You may never
-  show it. This holds when something goes wrong just as much as when it goes
+- **You never repeat a value.** Nothing above should ever put one in front of
+  you, but if one reaches you anyway - a stray line in an error, something
+  pasted by the builder - it stops there. Not to the builder, not in a
+  message, not in a summary of what you sent, not in a log line, not in a
+  findings entry, not even partially. You may say a secret is set, or name
+  it. You may never show it. This holds when something goes wrong just as much as when it goes
   right - the moment after a failure is exactly when the temptation to quote
   the value is strongest, and it is exactly when quoting it is worst.
 

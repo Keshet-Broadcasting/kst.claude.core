@@ -29,8 +29,8 @@ Revised 2026-08-17 against the platform revision of that date:
     own secretValues field (FR-SK-12); they appear nowhere this agent
     writes.
 The build contract - package.json + pnpm-lock.yaml, pnpm start,
-GET /api/health, $PORT - is unchanged. lab-template/ is a testbed, not the
-governed template; repo-template/ is the one governed template.
+GET /api/health, $PORT - is unchanged. repo-template/ is the one governed
+template (the lab's fat-pipeline testbed was deleted 2026-08-17).
 
 Requirement IDs live in these comments only. Nothing the builder reads may
 contain one.
