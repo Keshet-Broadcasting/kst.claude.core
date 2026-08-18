@@ -7,7 +7,7 @@ const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
   prettier,
-  globalIgnores(['.next/**', 'node_modules/**', 'coverage/**', '.claude/**']),
+  globalIgnores(['.next/**', 'node_modules/**', 'coverage/**', '.claude/**', 'plugins/**']),
   {
     files: ['src/**/*.{ts,tsx}'],
     ignores: ['src/shared/embeds/**'],
