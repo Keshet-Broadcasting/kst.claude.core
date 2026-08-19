@@ -29,8 +29,8 @@ The storage model (D-25, FR-SK-12):
   MAY take a value from the builder and write it there under the declared name.
   That file is the ONLY place on the machine a value may enter.
 - `.env` is in the mandatory exclusion set (FR-BR-22): out of the pushed tree
-  and out of the treeDigest. Values travel in the deploy request's own
-  `secretValues` field (name -> value), never inside `files`.
+  and out of the treeDigest. Values travel in the deploy request's own env
+  value maps (name -> value), never inside `files`.
 - **The send tooling reads `.env` and fills that field itself.**
   No agent reads a value to send it, exactly as no agent handles the builder's
   sign-in: an agent's inputs are written into its transcript, so a value that

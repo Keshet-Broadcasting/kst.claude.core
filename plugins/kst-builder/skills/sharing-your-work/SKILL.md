@@ -211,25 +211,25 @@ story about their own app.
 
 ### When Keshet refuses to accept it
 
-This is normal and it is not a fault. Every refusal comes back with a code -
-look it up in [broker/refusal-codes.json](../../../broker/refusal-codes.json)
-and show the builder the message written there. Never invent your own wording,
-and never show them the code itself.
+This is normal and it is not a fault. Every refusal comes back from the send
+tooling as a plain-language explanation with a next step. Show the builder
+that explanation as it is. Never invent your own wording, and never show
+them a raw code or an error dump.
 
-Then check `builderCanFix`:
+Then act on whether the builder can fix it:
 
-**`true` - fix it together.** These are the common ones:
+**They can - fix it together.** These are the common ones:
 
 | What happened | What you do |
 | :-- | :-- |
-| Their sign-in has expired | Send again - a Keshet sign-in window opens, they sign in with their usual account, and it carries on. Nothing is lost. Never handle the sign-in yourself |
+| Their sign-in has expired | Send again - a fresh sign-in code and address appear, they sign in with their usual account, and it carries on. Nothing is lost. Never handle the sign-in yourself |
 | No audience was chosen | Ask who should be able to open the app. There is no "everyone" |
 | The deployment details are incomplete | Ask the missing questions and fill them in |
 | The app name will not work | Show the reasons that came back, pick a new one together, retry. See the `naming-your-app` skill |
 | There's already an app called that | Somebody else has that name. Pick a different one and send again. Nothing was created, so there is nothing to undo |
 | The checks are out of date because the app changed | Re-run the chain, then retry |
 
-**`false` - it is not their problem, and must not be presented as one.** Say
+**They cannot - it is not their problem, and must not be presented as one.** Say
 what happened in one sentence, say you have reported it, quote the reference,
 and do not ask them to do anything:
 

@@ -9,17 +9,19 @@ tools: Read, Grep, Glob, Bash, Write
 <!--
 Requirements: FR-BL-14, FR-BL-15, FR-BL-16, FR-BL-17, FR-BL-19, FR-BL-20,
 FR-BR-10, FR-BR-22, FR-BR-26, FR-SK-12.
-Contract: broker/API_CONTRACT.md - one deploy operation, no checkName, a
-secretValues field, .env in the mandatory exclusion set, and no
-APP_EXISTS_OWNED_BY_YOU code. Schema:
-platform/schemas/verifier-signoff.schema.json. Refusals:
-broker/refusal-codes.json. ITCC: docs/ITCC_FORM_INPUT_OUTPUT.md.
-Sign-in: FR-BR-23 (the builder's own token, acquired by interactive
-public-client sign-in - auth code + PKCE, device code only where no browser
-can open - cached in OS-native protected storage) and FR-BR-24 (audience-
-bound to the deploy API's own Deploy.Invoke scope). One app registration is
-both the API and the public client, and the send tooling owns the sign-in
-end to end so no token ever enters this agent's context.
+Contract: kst.auth.api src/apps (POST /api/apps, CreateAndPushDto) - one
+deploy operation, no checkName, secret values as env maps
+(shared/stage/prod), files as a list of path+encoding+content entries,
+.env in the mandatory exclusion set, and no APP_EXISTS_OWNED_BY_YOU code.
+Schema: platform/schemas/verifier-signoff.schema.json. ITCC:
+docs/ITCC_FORM_INPUT_OUTPUT.md. Send tooling: scripts/send-deploy.sh in
+this plugin - device-code sign-in via the API's own endpoints, refusal
+mapping to plain language, distinct exit codes.
+Sign-in: FR-BR-23 (the builder's own token, acquired through the service's
+device sign-in; the send tooling owns it end to end and the token lives
+only inside the tooling's process) and FR-BR-24. One app registration is
+both the API and the public client. No token ever enters this agent's
+context.
 Requirement IDs and file paths appear in these instructions only - never in
 anything the builder reads.
 -->
@@ -198,18 +200,47 @@ The request carries:
 - `deployRequest` - the full text of `DEPLOY_REQUEST.md`, as is. Never a
   version with the stamped blocks hand-edited.
 - `signoff` - the record from step 4.
-- `files` - the app tree as a map of repo-relative, forward-slashed paths
-  (no leading slash, no `..`) to `{ "encoding": ..., "content": ... }`.
-  Encoding is `utf-8` for text and `base64` only for genuinely binary
+- `files` - the app tree as a list of entries, each a repo-relative,
+  forward-slashed path (no leading slash, no `..`) with the file's content
+  and its encoding: `utf-8` for text and `base64` only for genuinely binary
   files, never as a default. Apply the same exclusions the digest used, and
   they are the same list again: `node_modules/`, `.git/`, `.next/`,
   `dist/`, `build/`, `.env` and every `.env.*`. Bounds: at most 10 MB
   decoded in total and at most 2000 files after exclusions - a normal app
   sits far under both, so approaching them means something was swept in
   that should not be sent.
-- `secretValues` - the app's secret values, as a map of name to value. **The
+- `env` - the app's secret values, as maps of name to value grouped by
+  environment; every value from `.env` travels in the `shared` map. **The
   send tooling reads these out of `.env` itself, at the moment it sends. You
   do not read them, assemble them, or pass them on.** See below.
+
+### Running the send tooling
+
+The send tooling ships with this plugin. Write the sign-off record from
+step 4 to a JSON file **outside the app folder** - inside it, the file would
+change the very tree it signs - then run:
+
+```
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/send-deploy.sh" --signoff <sign-off file> <app folder>
+```
+
+It signs the builder in, assembles the whole request itself - the fields
+from `DEPLOY_REQUEST.md`, the file tree after the exclusions, the secret
+values from `.env` - sends it, and follows the run, printing plain-language
+progress. Pass what it prints on to the builder as it appears. Its exit
+code is the outcome, and you act on it and on nothing else:
+
+| Exit | Meaning | What you do |
+| :-- | :-- | :-- |
+| 0 | Accepted - the app is with Keshet; the automatic checks and IT review follow | Tell the builder it is sent, in the wording below |
+| 2 | Refused - the reason was printed | Relay the printed explanation verbatim, then act on it (below) |
+| 3 | Keshet could not be reached, or gave no final answer | Say so plainly; running the send again is safe |
+| 4 | Sign-in failed or timed out | Run the send again; a fresh sign-in code appears |
+| anything else | The tooling itself could not run | **Not approved.** Report a platform problem and stop |
+
+If the script is missing, will not start, or exits with a code not in this
+table, that is **not approved**: no way to send is a platform problem to
+report, never a gap to bridge by hand.
 
 ### The builder's sign-in travels with the request, never through you
 
@@ -235,14 +266,15 @@ Concretely, and with no exceptions:
   Say so plainly and stop. No way to send is a platform problem to report,
   never a gap for you to bridge with a credential of your own making.
 
-**A sign-in prompt is routine, not a failure.** The first time an app is sent
-from a machine - and roughly once a day after that, because Keshet's policy
-expires a sign-in daily - the tooling opens a browser window asking the
-builder to sign in with their ordinary Keshet account. That is the system
-working normally, so present it that way:
+**A sign-in prompt is routine, not a failure.** On every send the tooling
+prints a web address and a short code. The builder opens the address, enters
+the code, and signs in with their ordinary Keshet account, approving the
+phone prompt if one appears; the tooling waits and then carries on by
+itself. That is the system working normally, so present it that way:
 
-> "A Keshet sign-in window is opening - it's the same account you use for
-> everything else. Sign in there and I'll carry on."
+> "Keshet needs you to sign in - it's the same account you use for
+> everything else. Open the address I've just shown you, enter the code, and
+> I'll carry on the moment you're done."
 
 Once they have, carry on. Nothing is lost, nothing needs redoing, and nothing
 about the app changed while they signed in.
@@ -265,7 +297,7 @@ Apply the exclusion by name, every time, at every size, in both the digest
 and the file map. If a `.env` ever reached `files`, every secret in it would
 be in the repository, and no later fix removes it from the history.
 
-### `secretValues` - the one way a secret value travels
+### The secret values - the one way they travel
 
 The values still have to get to Keshet, or the app cannot run. They travel
 in their own field, beside the tree and never inside it - and they travel the
@@ -316,16 +348,15 @@ that. You were told it was accepted.
 
 ## When the service refuses
 
-A refusal is an answer, not a fault. It comes back with a code, whether the
-builder can fix it, a reference id, and sometimes details. Never show the
-builder the code or invent your own wording - look the code up in
-`broker/refusal-codes.json` and show the `builderMessage` written there,
-verbatim. The `sharing-your-work` skill has the full playbook; do not
+A refusal is an answer, not a fault. The send tooling turns each one into a
+plain-language explanation with the next step, and prints it. Show the
+builder that explanation verbatim - never a raw code, and never wording of
+your own. The `sharing-your-work` skill has the full playbook; do not
 improvise around it. Then act on whether the builder can fix it:
 
 **They can fix it - fix it together.** The common ones: the sign-in expired
-(send again; the sign-in window opens, they sign in, nothing is lost); no
-audience chosen (ask
+(send again; a fresh sign-in code appears, they sign in, nothing is lost);
+no audience chosen (ask
 who should open the app - there is no "everyone"); incomplete details (the
 response names the missing fields - ask only those questions); the name
 will not work, or somebody else already has it (pick a new one together and

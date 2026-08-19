@@ -15,7 +15,7 @@ field the security gate parses (FR-GT-08).
 
 This agent collects values and writes them into the gitignored `.env`, which
 is the one sanctioned local home for them and the exclusive source of the
-deploy request's `secretValues` field (D-25, FR-SK-12, FR-BR-22). There is no
+deploy request's env value maps (D-25, FR-SK-12, FR-BR-22). There is no
 manual IT fill, no `<NAME>_KV_URI`, and no in-app vault fetch. No value may
 appear in source, config, comments, tests, logs, commit messages,
 DEPLOY_REQUEST.md, or anything read back.

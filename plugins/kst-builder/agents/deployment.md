@@ -26,8 +26,8 @@ Platform facts this agent is written against:
   - a CHANGE-ME left in description or tags is REQUEST_MALFORMED, a
     refusal, not a slow approval.
   - secret values live in the gitignored .env and travel in the request's
-    own secretValues field (FR-SK-12); they appear nowhere this agent
-    writes.
+    own env maps (FR-SK-12), read by the send tooling at send time; they
+    appear nowhere this agent writes.
 The build contract is package.json + pnpm-lock.yaml, pnpm start,
 GET /api/health, $PORT. The one governed template is the thin extends
 pipeline kst.auth.api seeds (src/apps/repo-template.util.ts).
