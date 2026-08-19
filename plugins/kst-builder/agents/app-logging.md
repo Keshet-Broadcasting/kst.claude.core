@@ -14,9 +14,8 @@ FR-OB-01, and they land in the shared workspace alongside deployment logs
 and the audit stream (FR-OB-05).
 
 FR-OB-08 requires a single correlationId to span the whole flow including the
-deployed app's logs, but as of 2026-08-17 no carrier writes that id into the
-repo or into the app's run context, so the app cannot be told to depend on
-one. The agent therefore mandates the app's own request id and treats a
+deployed app's logs, but no carrier writes that id into the repo or into the
+app's run context, so the app cannot be told to depend on one. The agent therefore mandates the app's own request id and treats a
 platform-supplied correlation id as optional-if-present. Restore the stronger
 wording only once a carrier exists.
 

@@ -23,10 +23,7 @@ storage model.
 Requirements: FR-SK-01, FR-SK-03, FR-SK-04, FR-SK-06, FR-SK-08, FR-SK-12,
 FR-BL-13, FR-BR-22, D-25.
 
-REVISED 2026-08-17. This section previously said builder-supplied values were
-placed in the vault out of band by Keshet's platform team, and that collecting
-a value was out of scope. **That model is dead (D-25, FR-SK-12).** The model
-now:
+The storage model (D-25, FR-SK-12):
 
 - The gitignored `.env` is the sanctioned local home for real values. The agent
   MAY take a value from the builder and write it there under the declared name.
@@ -34,7 +31,7 @@ now:
 - `.env` is in the mandatory exclusion set (FR-BR-22): out of the pushed tree
   and out of the treeDigest. Values travel in the deploy request's own
   `secretValues` field (name -> value), never inside `files`.
-- **The send tooling reads `.env` and fills that field itself** (2026-08-17).
+- **The send tooling reads `.env` and fills that field itself.**
   No agent reads a value to send it, exactly as no agent handles the builder's
   sign-in: an agent's inputs are written into its transcript, so a value that
   passes through one has left the machine by a second route. Agents work in
@@ -48,7 +45,7 @@ now:
   names as Key Vault-backed references resolved by the app's managed identity,
   the only identity with read access (FR-SK-04).
 - There is no manual IT/platform-team fill. There is no `<NAME>_KV_URI` and no
-  in-app vault fetch - that was the 2026-08-16 intermediate design, superseded.
+  in-app vault fetch.
 
 Unchanged and not to be weakened: no value in source, config, comments, tests,
 logs, commit messages, DEPLOY_REQUEST.md, or anything read back to the builder.

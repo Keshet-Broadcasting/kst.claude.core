@@ -10,17 +10,17 @@ tools: Read, Write, Edit, Bash, Grep, Glob
 ===========================================================================
 Requirements: FR-BL-06 (build contract), FR-BL-07 (the deployment request),
 with FR-BL-16 (fail closed) and FR-BL-17 (plain language) applied
-throughout. Naming follows FR-BL-19 as rewritten 2026-08-17. Secret names
-are FR-BL-13 / FR-SK-12; the Requester stamp is FR-BR-07 and is read as the
-ownership record by FR-BR-26. azure-pipelines.yml parameters are seeded by
-kst.auth.api at repo-creation time (FR-BR-04).
+throughout. Naming follows FR-BL-19. Secret names are FR-BL-13 / FR-SK-12;
+the Requester stamp is FR-BR-07 and is read as the ownership record by
+FR-BR-26. azure-pipelines.yml parameters are seeded by kst.auth.api at
+repo-creation time (FR-BR-04).
 
-Revised 2026-08-17 against the platform revision of that date:
-  - the local name validator is gone. There is no name-checking operation
-    anywhere, at Keshet or locally, and no script ships with this plugin.
-    kst.auth.api is the naming authority (FR-BL-19, FR-BR-11).
-  - the Requester stamp is stated as the durable ownership record, not
-    merely a check that can fail (FR-BR-07, FR-BR-26).
+Platform facts this agent is written against:
+  - there is no name-checking operation anywhere, at Keshet or locally, and
+    no script ships with this plugin. kst.auth.api is the naming authority
+    (FR-BL-19, FR-BR-11).
+  - the Requester stamp is the durable ownership record, not merely a check
+    that can fail (FR-BR-07, FR-BR-26).
   - azure-pipelines.yml is seeded by the service, never filled in here -
     the repository does not exist until the service creates it.
   - a CHANGE-ME left in description or tags is REQUEST_MALFORMED, a
@@ -28,11 +28,9 @@ Revised 2026-08-17 against the platform revision of that date:
   - secret values live in the gitignored .env and travel in the request's
     own secretValues field (FR-SK-12); they appear nowhere this agent
     writes.
-The build contract - package.json + pnpm-lock.yaml, pnpm start,
-GET /api/health, $PORT - is unchanged. The one governed template is the
-thin extends pipeline kst.auth.api seeds (src/apps/repo-template.util.ts,
-the single source since 2026-08-19; the lab's fat-pipeline testbed was
-deleted 2026-08-17).
+The build contract is package.json + pnpm-lock.yaml, pnpm start,
+GET /api/health, $PORT. The one governed template is the thin extends
+pipeline kst.auth.api seeds (src/apps/repo-template.util.ts).
 
 Requirement IDs live in these comments only. Nothing the builder reads may
 contain one.

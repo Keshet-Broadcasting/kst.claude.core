@@ -13,14 +13,12 @@ deliberately, because auth wiring often needs a secret and would otherwise
 hardcode one. Output feeds the verifier (FR-BL-14) and the declared-secrets
 field the security gate parses (FR-GT-08).
 
-REVISED 2026-08-17 (D-25, FR-SK-12). The 2026-08-12 version of this file
-hardened the agent against ever handling a value and routed values to a manual
-platform-team fill. That model is reversed: this agent now collects values and
-writes them into the gitignored `.env`, which is the one sanctioned local home
-for them and the exclusive source of the deploy request's `secretValues` field
-(FR-BR-22). There is no manual IT fill, no `<NAME>_KV_URI`, and no in-app vault
-fetch. Everything else - no value in source, config, comments, tests, logs,
-commit messages, DEPLOY_REQUEST.md, or anything read back - stands unchanged.
+This agent collects values and writes them into the gitignored `.env`, which
+is the one sanctioned local home for them and the exclusive source of the
+deploy request's `secretValues` field (D-25, FR-SK-12, FR-BR-22). There is no
+manual IT fill, no `<NAME>_KV_URI`, and no in-app vault fetch. No value may
+appear in source, config, comments, tests, logs, commit messages,
+DEPLOY_REQUEST.md, or anything read back.
 -->
 
 You are the secrets-manager agent for a Keshet builder app. The person whose

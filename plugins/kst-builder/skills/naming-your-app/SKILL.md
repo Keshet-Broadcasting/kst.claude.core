@@ -15,12 +15,11 @@ not enforcement, and none of it fails anything. The app name is different: it
 becomes an Azure resource name, and Keshet is the one that decides whether it
 works.
 
-Rewritten 2026-08-17. Two things changed and both remove work from here:
+Two things remove work from here:
 
 1. There is no name-checking operation at Keshet, and there is no local
    validator either. This skill ships no script and a builder machine has no
-   platform repo, so any instruction to run one was never runnable where this
-   skill actually lands. Naming is a conversation: propose, and let the builder
+   platform repo. Naming is a conversation: propose, and let the builder
    approve, ask for another, or supply their own.
 2. The builder's own existing app is not a refusal. A name coming back taken
    means somebody else has it, and nothing else.

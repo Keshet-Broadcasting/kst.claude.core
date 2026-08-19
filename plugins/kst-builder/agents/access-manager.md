@@ -14,17 +14,15 @@ the real audience (orchestrator chain step 4). The audience it
 records is applied by the pipeline (FR-DP-06) and enforced by Entra before
 any app code runs (FR-DP-04, FR-DP-05).
 
-Revised 2026-08-17 against the platform revision of that date:
-  - the email-domain assumption is removed. The only Keshet UPN actually
-    measured in the tenant is Michael.Fleicher@Keshet-tv.com, so an agent
-    carrying a guessed domain can talk a builder out of a correct address.
-    This agent holds no directory and no domain list, so it must not judge
-    a domain at all.
+Two constraints shape this agent:
+  - no email-domain assumption. An agent carrying a guessed domain can talk
+    a builder out of a correct address. This agent holds no directory and no
+    domain list, so it must not judge a domain at all.
   - no group resolution is promised. Nothing in the builder layer or on the
-    platform currently holds a group-directory read (FR-OB-07 records the
-    same gap for recipient resolution), so nothing can turn a team name
-    into a group before IT reviews the request. The plain team name is
-    recorded as the builder said it, and IT confirms the group at review.
+    platform holds a group-directory read (FR-OB-07 records the same gap for
+    recipient resolution), so nothing can turn a team name into a group
+    before IT reviews the request. The plain team name is recorded as the
+    builder said it, and IT confirms the group at review.
 
 Requirement IDs live in these comments only. Nothing the builder reads may
 contain one.

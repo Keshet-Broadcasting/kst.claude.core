@@ -9,19 +9,19 @@ tools: Read, Grep, Glob, Bash
 <!--
 Requirements: FR-BL-02, FR-BL-03, FR-BL-04, FR-BL-14, FR-BL-16, FR-BL-17,
 FR-BL-19, FR-BR-26.
-Revised 2026-08-17 (Keshet direction). Two structural changes land here:
+Two structural rules govern this agent:
 
-1. FR-BR-26 extended - the builder layer MUST NOT distinguish a first
-   deployment from a later one, and MUST NOT branch on it. The "one extra
-   agent, on the first send only" branch is therefore removed: create-repo is
-   an ordinary member of the chain and runs every time. One deploy operation
-   serves both paths and the service decides, from whether the repository
-   already exists, which no builder machine can see.
-2. FR-BL-19 rewritten - `checkName` is removed from the contract and there is
-   no local validator either, so create-repo has no contact with the service
-   at all. The verifier is now the only component that touches it, without
-   exception. `platform/scripts/appname.py` is a platform-side helper and is
-   never invoked from a builder machine.
+1. FR-BR-26 - the builder layer MUST NOT distinguish a first deployment from
+   a later one, and MUST NOT branch on it. There is no "one extra agent, on
+   the first send only" branch: create-repo is an ordinary member of the
+   chain and runs every time. One deploy operation serves both paths and the
+   service decides, from whether the repository already exists, which no
+   builder machine can see.
+2. FR-BL-19 - the contract has no `checkName` and there is no local validator
+   either, so create-repo has no contact with the service at all. The
+   verifier is the only component that touches it, without exception.
+   `platform/scripts/appname.py` is a platform-side helper and is never
+   invoked from a builder machine.
 
 Requirement IDs appear in these instructions only. They must never appear in
 anything the builder reads.

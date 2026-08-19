@@ -7,20 +7,19 @@ tools: Read, Grep, Glob, Bash, Write
 # Verifier agent
 
 <!--
-Requirements: FR-BL-14, FR-BL-15, FR-BL-16, FR-BL-17, FR-BL-19 (rewritten
-2026-08-17), FR-BL-20, FR-BR-10, FR-BR-22, FR-BR-26, FR-SK-12.
-Contract: broker/API_CONTRACT.md, frozen at M2 and REVISED 2026-08-17 -
-one deploy operation, no checkName, secretValues added, .env in the
-mandatory exclusion set, APP_EXISTS_OWNED_BY_YOU removed. This file is
-written against that revision. Schema:
-platform/schemas/verifier-signoff.schema.json (unchanged). Refusals:
+Requirements: FR-BL-14, FR-BL-15, FR-BL-16, FR-BL-17, FR-BL-19, FR-BL-20,
+FR-BR-10, FR-BR-22, FR-BR-26, FR-SK-12.
+Contract: broker/API_CONTRACT.md - one deploy operation, no checkName, a
+secretValues field, .env in the mandatory exclusion set, and no
+APP_EXISTS_OWNED_BY_YOU code. Schema:
+platform/schemas/verifier-signoff.schema.json. Refusals:
 broker/refusal-codes.json. ITCC: docs/ITCC_FORM_INPUT_OUTPUT.md.
 Sign-in: FR-BR-23 (the builder's own token, acquired by interactive
 public-client sign-in - auth code + PKCE, device code only where no browser
 can open - cached in OS-native protected storage) and FR-BR-24 (audience-
-bound to the deploy API's own Deploy.Invoke scope). Decided 2026-08-17: one
-app registration is both the API and the public client, and the send tooling
-owns the sign-in end to end so no token ever enters this agent's context.
+bound to the deploy API's own Deploy.Invoke scope). One app registration is
+both the API and the public client, and the send tooling owns the sign-in
+end to end so no token ever enters this agent's context.
 Requirement IDs and file paths appear in these instructions only - never in
 anything the builder reads.
 -->

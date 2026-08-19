@@ -8,14 +8,12 @@ tools: Read, Grep, Glob, Bash
 
 <!--
 Requirements: FR-BL-09, FR-BL-16, FR-BL-17.
-Revised 2026-08-17 for the .env conduit: FR-SK-12, FR-BL-13, FR-SK-06,
-FR-BR-22, FR-SK-04. A gitignored, untracked .env holding real values is the
-sanctioned state and is NOT a finding; the findings are a tracked or committed
-.env, a value in any other file, a value anywhere in history, and any mismatch
-between the .env key list and declared-secrets. Supersedes the 2026-08-12 text,
-which treated any .env containing real values as a leak, and the intermediate
-2026-08-16 design of per-secret <NAME>_KV_URI variables, in-app vault fetches,
-and a manual platform-team fill - none of which exist.
+The .env conduit: FR-SK-12, FR-BL-13, FR-SK-06, FR-BR-22, FR-SK-04. A
+gitignored, untracked .env holding real values is the sanctioned state and is
+NOT a finding; the findings are a tracked or committed .env, a value in any
+other file, a value anywhere in history, and any mismatch between the .env key
+list and declared-secrets. There are no per-secret <NAME>_KV_URI variables, no
+in-app vault fetches, and no manual platform-team fill - none of these exist.
 Requirement IDs appear in these instructions only. They must never appear in
 anything the builder reads.
 -->

@@ -8,31 +8,30 @@ tools: Read, Glob
 
 <!--
 Requirements: FR-BL-05, FR-BL-14, FR-BL-16, FR-BL-19, FR-BR-26.
-Revised 2026-08-17 (Keshet direction), and the revision is structural:
 
-1. FR-BL-19 rewritten. There is no name-checking operation - `checkName` is
-   removed from the contract - and there is no local validator either.
+1. FR-BL-19: there is no name-checking operation - the contract has no
+   `checkName` - and there is no local validator either.
    `platform/scripts/appname.py` is a platform-side helper, is not shipped to
    builder machines, and must never be invoked from here: the plugin ships no
-   scripts and a builder machine has no platform repo. The naming task is now
-   a conversation - propose, approve, change - and kst.auth.api is the naming
+   scripts and a builder machine has no platform repo. The naming task is a
+   conversation - propose, approve, change - and kst.auth.api is the naming
    authority that derives the repository, subdomain, vault and app-registration
    names from the one approved name (FR-BR-11).
-2. FR-BR-26 extended: the builder layer MUST NOT distinguish a first
-   deployment from a later one. This agent therefore runs on every send, not
-   "on the first send only" - a builder machine cannot know which it is.
-3. FR-BR-28 superseded: `APP_EXISTS_OWNED_BY_YOU` is deleted from the closed
-   set. The builder's own existing app is an ordinary successful new version,
-   resolved silently server-side from the requester stamp. `NAME_TAKEN` means
-   only that somebody else holds the name.
+2. FR-BR-26: the builder layer MUST NOT distinguish a first deployment from a
+   later one. This agent therefore runs on every send, not "on the first send
+   only" - a builder machine cannot know which it is.
+3. FR-BR-28: the closed set has no `APP_EXISTS_OWNED_BY_YOU` code. The
+   builder's own existing app is an ordinary successful new version, resolved
+   silently server-side from the requester stamp. `NAME_TAKEN` means only
+   that somebody else holds the name.
 
 FR-BL-05's "call the push-broker to create the repo" is satisfied through the
 verifier: repo creation happens inside the single deploy operation, and
 FR-BL-14 makes the verifier the only agent that may invoke it.
 
-Naming note: `create-repo` is now a poor fit for what this agent does - it
-agrees a name and checks a request, and it has never created a repo. The name
-and file name are kept deliberately, because renaming ripples into PLAN.md,
+Naming note: `create-repo` is a poor fit for what this agent does - it agrees
+a name and checks a request, and it never creates a repo. The name and file
+name are kept deliberately, because renaming ripples into PLAN.md,
 deliverable #16 and FR-BL-05.
 
 Requirement IDs appear in these instructions only, never in anything the

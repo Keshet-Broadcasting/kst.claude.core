@@ -34,7 +34,7 @@ Both layers can be present. Neither substitutes for the other:
 **Deliverable #17 must state which of the two it addresses** before the
 access-manager agent is written.
 
-**Answered 2026-08-02: both, on one screen.** That is what Keshet demonstrated and
+**The answer: both, on one screen.** That is what Keshet demonstrated and
 what Keshet expects. It does not merge the two layers - they are still enforced in
 different places, by different systems, at different times - so #17 has to present
 one list over two mechanisms. The requirement that falls out of that: **one write
@@ -52,10 +52,10 @@ implementation gap analysis §9 item 3.
    matters because React below 19 does not set non-primitive props on custom
    elements, which breaks `getToken`; it is a React problem, not a widget one.
 
-   *(Corrected 2026-08-02. This note previously said the React 19 requirement
-   ruled the widget out for the `python` archetype entirely. It does not, and the
-   difference matters: it means embedding the widget is a live option for every
-   archetype the platform supports, so #17's shape is not constrained by it.)*
+   *(The React 19 requirement does not rule the widget out for the `python`
+   archetype, and the difference matters: embedding the widget is a live option
+   for every archetype the platform supports, so #17's shape is not constrained
+   by it.)*
 
 2. **Each host app needs admin-consented delegated access** to the auth API's
    app registration - **one grant per host application**, not one per
