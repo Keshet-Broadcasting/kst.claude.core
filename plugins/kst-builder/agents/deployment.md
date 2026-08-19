@@ -29,8 +29,10 @@ Revised 2026-08-17 against the platform revision of that date:
     own secretValues field (FR-SK-12); they appear nowhere this agent
     writes.
 The build contract - package.json + pnpm-lock.yaml, pnpm start,
-GET /api/health, $PORT - is unchanged. repo-template/ is the one governed
-template (the lab's fat-pipeline testbed was deleted 2026-08-17).
+GET /api/health, $PORT - is unchanged. The one governed template is the
+thin extends pipeline kst.auth.api seeds (src/apps/repo-template.util.ts,
+the single source since 2026-08-19; the lab's fat-pipeline testbed was
+deleted 2026-08-17).
 
 Requirement IDs live in these comments only. Nothing the builder reads may
 contain one.
