@@ -19,7 +19,7 @@ Report the script's output. If it installed anything, tell the user to **restart
 
 # Version history from the first moment
 
-The moment building starts, this project must be a local git repo. If there is no `.git` folder, run `git init` and make a first checkpoint before (or together with) the first code change - do not wait for a deploy, and do not wait to be asked. Before that first checkpoint, verify `.gitignore` covers `.env*` and `node_modules`, and add them if missing. From then on, checkpoint automatically after every verified piece of work, so there is always a version to go back to. This rule is unconditional; the `start-with-a-repo` skill explains the how, and the `sharing-your-work` skill (from the kst-builder plugin) is the full playbook.
+The moment building starts, this project must be a local git repo. If there is no `.git` folder, run `git init` and make a first checkpoint before (or together with) the first code change - do not wait for a deploy, and do not wait to be asked. Before that first checkpoint, verify `.gitignore` covers `.env*` and `node_modules`, and add them if missing. From then on, checkpoint automatically after every verified piece of work, so there is always a version to go back to. This rule is unconditional; the `start-with-a-repo` skill explains the how, and the `sharing-your-work` skill (from the auto_deployment plugin) is the full playbook.
 
 # Commands
 
@@ -68,7 +68,7 @@ Rules:
 
 # Sending the app to Keshet
 
-This applies when the project is a Keshet builder app (the `kst-builder` plugin is installed). When the user says "deploy", "publish", "ship it", "put it live", or "share it with the team", the deploy chain runs - they never have to name an agent. Run the agents in this order. **The order is not a suggestion**: each one depends on the one before it having already changed the code.
+This applies when the project is a Keshet builder app (the `auto_deployment` plugin is installed). When the user says "deploy", "publish", "ship it", "put it live", or "share it with the team", the deploy chain runs - they never have to name an agent. Run the agents in this order. **The order is not a suggestion**: each one depends on the one before it having already changed the code.
 
 ```
 1. deployment        prepare the app against the build contract, and collect
@@ -114,7 +114,7 @@ Never skip step 1. Never create the folder by hand. Read the `embeds` skill befo
 
 # Skills
 
-The skills below ship in the `starter` and `kst-builder` plugins (installed by
+The skills below ship in the `starter` and `auto_deployment` plugins (installed by
 `node scripts/setup-plugins.mjs` per AGENTS.md). Read the relevant skill before
 writing code in its domain.
 
@@ -127,7 +127,7 @@ writing code in its domain.
 - `state-management-guide` — decision tree for state placement.
 - `css-modules` — design tokens, theming, dark mode.
 - `embeds` — `pnpm embed:add`, custom element lifecycle, `embed.json`.
-- `definition-of-done` (kst-builder plugin) - what "done" means before reporting work complete, and before sending to Keshet.
-- `env-vars` — `.env.local`, `NEXT_PUBLIC_`, zod validation. For anything secret, the `secrets-in-your-app` skill from the kst-builder plugin wins.
+- `definition-of-done` (auto_deployment plugin) - what "done" means before reporting work complete, and before sending to Keshet.
+- `env-vars` — `.env.local`, `NEXT_PUBLIC_`, zod validation. For anything secret, the `secrets-in-your-app` skill from the auto_deployment plugin wins.
 - `start-with-a-repo` - version history exists from the very first change; fires at the start of building.
-- `sharing-your-work` (kst-builder plugin) - all version control and sending to Keshet, operated on the user's behalf in plain language.
+- `sharing-your-work` (auto_deployment plugin) - all version control and sending to Keshet, operated on the user's behalf in plain language.

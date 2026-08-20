@@ -9,7 +9,7 @@
   },
   "enabledPlugins": {
     "starter@kst": true,
-    "kst-builder@kst": true,
+    "auto_deployment@kst": true,
     "superpowers@claude-plugins-official": true,
     "typescript-lsp@claude-plugins-official": true,
     "chrome-devtools-mcp@claude-plugins-official": true,
