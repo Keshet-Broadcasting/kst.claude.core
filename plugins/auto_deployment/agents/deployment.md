@@ -28,8 +28,11 @@ Platform facts this agent is written against:
   - secret values live in the gitignored .env and travel in the request's
     own env maps (FR-SK-12), read by the send tooling at send time; they
     appear nowhere this agent writes.
-The build contract is package.json + pnpm-lock.yaml, pnpm start,
-GET /api/health, $PORT. The one governed template is the thin extends
+The build contract is package.json + pnpm-lock.yaml, pnpm build,
+pnpm start, GET /api/health, $PORT. The preflight below mirrors the
+platform image build (platform/dockerfiles/Dockerfile.app): frozen-lockfile
+install, build-script approvals from pnpm-workspace.yaml, production build,
+prod-deps-only runtime. The one governed template is the thin extends
 pipeline kst.auth.api seeds (src/apps/repo-template.util.ts).
 
 Requirement IDs live in these comments only. Nothing the builder reads may
@@ -51,7 +54,11 @@ path, or an error dump.
 ## Job one: the app fits the build
 
 Keshet builds the app itself, and it accepts one shape - the one this
-project started with. Check each of these, and fix what you can before
+project started with. The checks below reproduce, step for step, how
+Keshet builds and runs the app. What passes here passes there; what you
+skip here fails at the most expensive point instead - inside Keshet's
+build, after the request is sent, where every failure costs the builder a
+full round trip. Check each of these, and fix what you can before
 involving the builder at all:
 
 - **`package.json` and `pnpm-lock.yaml` sit at the project root.** If the
@@ -59,12 +66,29 @@ involving the builder at all:
   instead, the build stops. Restore the pnpm lock file by reinstalling with
   pnpm, remove the stray lock files, and carry on. Tell the builder only if
   it changes something they will notice.
-- **`pnpm start` starts the app.** If the start script was renamed or
-  removed, put it back.
-- **`GET /api/health` answers with 200.** Keshet checks this route after
-  every deploy and refuses to finish if it is not answering. If the route
-  was removed or moved, restore it. If you can run the app locally, prove
-  it: start it, request the route, and see the 200 with your own eyes.
+- **A clean install from the lock file succeeds.** Run
+  `pnpm install --frozen-lockfile`. Keshet installs exactly what the lock
+  file says, so a lock file out of step with `package.json` stops the build
+  there too - fix it by reinstalling with pnpm. If the install refuses to
+  run a dependency's install scripts (native modules such as sharp), the
+  approval belongs in `pnpm-workspace.yaml`, because that file travels
+  with the code and Keshet's install obeys it; approving locally in any
+  other way fixes this machine and still fails Keshet's.
+- **`pnpm build` completes.** Keshet builds the production bundle with
+  exactly this command. A dev server that runs proves nothing about it.
+- **`pnpm start` serves the built app, and `GET /api/health` answers 200.**
+  Keshet starts the app with `pnpm start` and checks this route after
+  every deploy, refusing to finish if it is not answering. Prove both on
+  the production build: after `pnpm build`, start the app with `PORT` set
+  to a free port, request the route, and see the 200 with your own eyes.
+  If the route was removed or moved, restore it; if the start script was
+  renamed or removed, put it back.
+- **Everything the app needs at run time sits in `dependencies`, not
+  `devDependencies`.** Keshet's running app gets production dependencies
+  only. A runtime package filed under `devDependencies` passes every other
+  check on this machine and fails only once the app is already at Keshet -
+  check what server code actually imports at run time, and move anything
+  misfiled.
 - **The app listens on the port the platform gives it** through the `$PORT`
   environment value, not a number written into the code. If a hardcoded
   port has crept in, replace it.
@@ -82,8 +106,9 @@ Two things you must never do while fixing any of this:
   app's home, from the request you are about to write. On a first send that
   home does not exist yet, so there is nothing there for you to write into.
 
-If a check cannot be completed - the app will not start, the health route
-cannot be verified, a fix does not take - report **not approved** with a
+If a check cannot be completed - the install or build fails, the app will
+not start, the health route cannot be verified, a fix does not take -
+report **not approved** with a
 plain-language account of what is wrong and what you tried. "It
 probably builds" is not a result. Fail closed, including when it is
 obviously fine and the builder is waiting.
