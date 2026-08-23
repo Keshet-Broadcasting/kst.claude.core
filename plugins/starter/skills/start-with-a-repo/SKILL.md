@@ -7,7 +7,7 @@ description: Use at the START of building, before writing or changing any code â
 
 **Building never starts without version history.** If the user is about to build, or you are about to change code, and this project has no local git repo yet, set one up first. Do not wait for a deploy, and do not wait to be asked - by the time someone says "deploy", it is too late to give them checkpoints for everything that came before.
 
-This skill is the trigger. The full playbook for operating git on the user's behalf - vocabulary, checkpoints, undo, recovery - is the `sharing-your-work` skill from the auto_deployment plugin. Read it and follow it; do not invent your own workflow here.
+This skill is the trigger. The full playbook for operating git on the user's behalf - vocabulary, checkpoints, undo, recovery - is the `sharing-your-work` skill from the auto-deployment plugin. Read it and follow it; do not invent your own workflow here.
 
 ## The check, every time building starts
 

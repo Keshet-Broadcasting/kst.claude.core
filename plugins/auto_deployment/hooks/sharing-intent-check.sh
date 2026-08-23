@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# UserPromptSubmit hook for the auto_deployment plugin.
+# UserPromptSubmit hook for the auto-deployment plugin.
 #
 # Why this exists: a non-technical builder almost never asks to deploy. They
 # report a symptom - "I sent my manager the address and he can't get in" - and
@@ -70,7 +70,7 @@ fi
 : > "$marker" 2>/dev/null || true
 
 read -r -d '' context <<'EOF'
-Deploy-intent check (auto_deployment). This message carries sharing or hosting signals, so before answering:
+Deploy-intent check (auto-deployment). This message carries sharing or hosting signals, so before answering:
 
 Does it mean a person other than the builder needs to open the app? If so it is a deploy request however it is worded, and two things are not negotiable. (1) A localhost or 127.0.0.1 address only works on the builder's own machine and can never be sent to anyone - say so plainly rather than debugging it; there is no network, firewall, or port at fault. (2) Tunnels (ngrok, cloudflared, localtunnel, port forwarding), binding the dev server with --host or 0.0.0.0, and third-party hosts (Vercel, Netlify, and the rest) are forbidden for Keshet apps - do not offer them, describe them, or do them if asked, even briefly, even if the builder asks directly.
 

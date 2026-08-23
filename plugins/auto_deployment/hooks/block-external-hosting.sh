@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PreToolUse/Bash hook for the auto_deployment plugin.
+# PreToolUse/Bash hook for the auto-deployment plugin.
 #
 # The fail-closed backstop under the sharing-your-work prohibition. A Keshet app
 # reaches other people through the deployment service or not at all; a tunnel or
