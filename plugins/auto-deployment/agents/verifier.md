@@ -139,6 +139,37 @@ nothing. That costs one round trip: pick a new name together (the
 `naming-your-app` skill) and send again. That is cheaper than a rule of
 your own that quietly disagrees with Keshet's.
 
+## Before you sign - the user-management widget is present and wired
+
+Every app ships with Keshet's user-management widget (`<kst-auth-widget>`)
+rendered on a page behind sign-in - it is where the app's owner manages what
+people may do inside the app, and it is part of the definition of done (the
+`definition-of-done` skill states it in full). An app without it is not
+approved, whatever every agent said. Confirm all three, in the tree you are
+about to digest:
+
+- **The widget is rendered.** The source contains the `kst-auth-widget`
+  element - in the starter, through its `KstAuthWidget` wrapper - and the
+  component that renders it is reachable from a page inside the signed-in
+  area. Grep for `kst-auth-widget`; a hit that is commented out, or in a
+  component no page imports, does not count.
+- **The id comes from the platform.** The `azure-app-id` the widget receives
+  traces back to `KST_AZURE_APP_ID` read from the environment - grep for
+  `process.env.KST_AZURE_APP_ID`. The pipeline sets that variable on the
+  running app; a hard-coded GUID in its place, or no read of it at all,
+  fails this check.
+- **No second sign-in.** In an app that signs users in itself, the widget is
+  given the host's token (`getToken` wired from the app's own MSAL session),
+  so the user is never asked to sign in twice.
+
+If any of these fails, that is **not approved**. Say it in the builder's
+language and hand back to the orchestrator to restore the wiring - you never
+patch it yourself:
+
+> "Every app includes the panel where the app's owner manages what people can
+> do inside it. It's been removed from this one, so I can't sign it off. I'm
+> having it put back the way it ships, and then I'll check everything again."
+
 ## Step 4 - build the sign-off record
 
 Emit the sign-off exactly in this shape - it is validated against a schema

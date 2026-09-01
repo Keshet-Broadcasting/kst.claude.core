@@ -1,0 +1,16 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.heading {
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.status {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--color-muted);
+}

@@ -60,6 +60,28 @@ deployment → secrets-manager → auth → access-manager → app-logging
 The verifier is the only thing that may hand work to Keshet. If it has not
 approved, the app does not go, however certain you are.
 
+## The user-management widget is part of every app
+
+Every app ships with Keshet's user-management widget (`<kst-auth-widget>`)
+rendered on a page behind sign-in. It is where the app's owner manages what
+people may do *inside* the app. It is not the front door: who may open the app
+at all is the audience the builder chose, enforced before any app code runs.
+Both layers are required, and neither substitutes for the other.
+
+"Present and wired" means all of these, and the verifier checks them before it
+signs off:
+
+- The widget renders on a protected page - not commented out, not on a page
+  nothing links to sign-in.
+- Its `azure-app-id` comes from `KST_AZURE_APP_ID`, the variable the deploy
+  pipeline sets on the running app. Never a hard-coded id.
+- In an app that signs users in itself, the widget receives the host's token
+  (`getToken`), so nobody is asked to sign in a second time.
+
+The starter includes all of this already wired. Removing the widget, or
+breaking its wiring, makes the app not ready to send - the verifier refuses to
+sign off without it, however finished everything else is.
+
 ## Fail closed - the rule that matters most
 
 **An agent that could not complete its check reports "not approved". Never
@@ -88,7 +110,7 @@ specific to confirm, and confirming it means checking, not assuming:
 | access-manager | The builder made an explicit choice about who may open the app |
 | app-logging | The logs exist and will actually arrive, not just that logging code was added |
 | security-review | The whole finished state was read, not the last change |
-| verifier | Every agent above is present and approved |
+| verifier | Every agent above is present and approved, and the user-management widget is present and wired |
 
 ## The sign-off
 
