@@ -1,0 +1,16 @@
+{
+  "//": "Shared, non-secret settings for the send tooling. Read by send-deploy.sh and send-deploy.ps1 - the two must agree, and scripts/validate-parity.sh checks that they do. NOTHING SECRET GOES IN THIS FILE. Environment variables override: KST_AUTH_API_BASE_URL, KST_DEPLOY_MAX_FILES, KST_DEPLOY_MAX_BYTES, KST_DEPLOY_POLL_COUNT, KST_DEPLOY_POLL_INTERVAL.",
+  "apiBaseUrl": "https://api-auth-stage.keshet-tv.com",
+  "limits": {
+    "maxFiles": 2000,
+    "maxBytes": 10485760
+  },
+  "polling": {
+    "count": 60,
+    "intervalSeconds": 5
+  },
+  "exclusions": {
+    "directories": ["node_modules", ".git", ".next", "dist", "build"],
+    "files": [".env", ".env.*"]
+  }
+}

@@ -33,18 +33,57 @@ readonly EXIT_REFUSED=2
 readonly EXIT_UNREACHABLE=3
 readonly EXIT_SIGNIN=4
 
+say()  { printf '%s\n' "$*"; }
+fail() { local rc="$1"; shift; say "$*"; exit "$rc"; }
+
+# --------------------------------------------------------------------------
+# Shared configuration - deploy-config.json next to this script
+#
+# The same file feeds send-deploy.ps1, so the two implementations agree on
+# the service address, the tree ceilings, the polling cadence, and the
+# exclusion list. NOTHING SECRET lives in it. Environment variables still
+# override, and built-in defaults cover a missing or unreadable file.
+# --------------------------------------------------------------------------
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG_FILE="${SCRIPT_DIR}/deploy-config.json"
+
+cfg() { # cfg <jq-path> <default> - config value or default, never fails
+  local v=""
+  if [[ -f "$CONFIG_FILE" ]] && command -v jq >/dev/null 2>&1; then
+    v="$(jq -r "$1 // empty" "$CONFIG_FILE" 2>/dev/null || true)"
+  fi
+  printf '%s' "${v:-$2}"
+}
+
 # The single switch point for which service instance receives the app. Set
 # KST_AUTH_API_BASE_URL to the production instance to send there; nothing
 # else in this script knows which instance it is talking to.
-BASE_URL="${KST_AUTH_API_BASE_URL:-https://api-auth-stage.keshet-tv.com}"
+BASE_URL="${KST_AUTH_API_BASE_URL:-$(cfg '.apiBaseUrl' 'https://api-auth-stage.keshet-tv.com')}"
 
 # Bounds the service enforces on the sent tree, checked here first so the
 # builder hears about a problem before a long upload rather than after one.
-readonly MAX_FILES=2000
-readonly MAX_BYTES=$((10 * 1024 * 1024))
+MAX_FILES="${KST_DEPLOY_MAX_FILES:-$(cfg '.limits.maxFiles' 2000)}"
+MAX_BYTES="${KST_DEPLOY_MAX_BYTES:-$(cfg '.limits.maxBytes' $((10 * 1024 * 1024)))}"
 
-say()  { printf '%s\n' "$*"; }
-fail() { local rc="$1"; shift; say "$*"; exit "$rc"; }
+# How long the script follows a deployment run before giving up.
+POLL_COUNT="${KST_DEPLOY_POLL_COUNT:-$(cfg '.polling.count' 60)}"
+POLL_INTERVAL="${KST_DEPLOY_POLL_INTERVAL:-$(cfg '.polling.intervalSeconds' 5)}"
+
+# The exclusion list - the same list the sign-off digest uses.
+EXCLUDE_DIRS=()
+if [[ -f "$CONFIG_FILE" ]] && command -v jq >/dev/null 2>&1; then
+  while IFS= read -r d; do
+    [[ -n "$d" ]] && EXCLUDE_DIRS+=("$d")
+  done < <(jq -r '.exclusions.directories[]?' "$CONFIG_FILE" 2>/dev/null || true)
+fi
+((${#EXCLUDE_DIRS[@]})) || EXCLUDE_DIRS=(node_modules .git .next dist build)
+EXCLUDE_FILES=()
+if [[ -f "$CONFIG_FILE" ]] && command -v jq >/dev/null 2>&1; then
+  while IFS= read -r p; do
+    [[ -n "$p" ]] && EXCLUDE_FILES+=("$p")
+  done < <(jq -r '.exclusions.files[]?' "$CONFIG_FILE" 2>/dev/null || true)
+fi
+((${#EXCLUDE_FILES[@]})) || EXCLUDE_FILES=('.env' '.env.*')
 
 
 # --------------------------------------------------------------------------
@@ -190,10 +229,16 @@ while IFS= read -r -d '' path; do
     jq -cn --arg p "$rel" --rawfile c "$path" \
       '{path: $p, encoding: "utf-8", content: $c}' >> "$FILES_NDJSON"
   fi
-done < <(find "$APP_DIR" \
-  \( -type d \( -name node_modules -o -name .git -o -name .next \
-                -o -name dist -o -name build \) -prune \) \
-  -o \( -type f ! -name '.env' ! -name '.env.*' -print0 \))
+done < <(
+  prune_expr=()
+  for d in "${EXCLUDE_DIRS[@]}"; do prune_expr+=(-name "$d" -o); done
+  prune_expr=("${prune_expr[@]:0:$((${#prune_expr[@]} - 1))}")
+  file_expr=()
+  for p in "${EXCLUDE_FILES[@]}"; do file_expr+=(! -name "$p"); done
+  find "$APP_DIR" \
+    \( -type d \( "${prune_expr[@]}" \) -prune \) \
+    -o \( -type f "${file_expr[@]}" -print0 \)
+)
 
 (( file_count > 0 )) \
   || fail "$EXIT_LOCAL" "The app folder has no files to send after the standard exclusions, so nothing was sent."
@@ -378,7 +423,22 @@ refuse_http() {
 
 accepted() {
   say "Accepted. The app is with Keshet now: it runs the automatic security checks, and someone from IT reviews what the app does and who can use it before it goes live. There is nothing more for the builder to do."
+  if [[ -n "${ITCC_ID:-}" ]]; then
+    say "ITCC case: ${ITCC_ID}"
+  fi
   exit 0
+}
+
+# The IT review case the run raised, when the answer carries one. Printed at
+# the end of a send so the builder and the approver look at the same case.
+ITCC_ID=""
+note_itcc() {
+  local id
+  id="$(jq -r '.itccId // empty' <<<"$1" 2>/dev/null || true)"
+  if [[ -n "$id" && "$id" != "null" ]]; then
+    ITCC_ID="$id"
+  fi
+  return 0
 }
 
 # --------------------------------------------------------------------------
@@ -396,6 +456,7 @@ RUN_ID="$(jq -r '.runId // empty' <<<"$BODY" 2>/dev/null || true)"
 SENT_APP="$(jq -r '.appName // empty' <<<"$BODY" 2>/dev/null || true)"
 FAILED_STEP="$(jq -r '.failedStep // empty' <<<"$BODY" 2>/dev/null || true)"
 LAST_ERR="$(jq -r '.lastErrorMessage // empty' <<<"$BODY" 2>/dev/null || true)"
+note_itcc "$BODY"
 
 case "$RUN_STATUS" in
   pending_approval|approving|completed) accepted ;;
@@ -406,13 +467,14 @@ esac
 
 say "Keshet accepted the request and is working on it..."
 last_step=""
-for _ in $(seq 1 60); do
-  sleep 5
+for _ in $(seq 1 "$POLL_COUNT"); do
+  sleep "$POLL_INTERVAL"
   RAW="$(api GET "/api/apps/${SENT_APP}/runs/${RUN_ID}" "" 60)" || continue
   HTTP="${RAW##*$'\n'}"
   BODY="${RAW%$'\n'*}"
   [[ "$HTTP" == 2* ]] || refuse_http "$HTTP" "$BODY"
   RUN_STATUS="$(jq -r '.status // empty' <<<"$BODY" 2>/dev/null || true)"
+  note_itcc "$BODY"
   step="$(jq -r '[.steps[]? | select(.status == "started")] | last | .name // empty' <<<"$BODY" 2>/dev/null || true)"
   if [[ -n "$step" && "$step" != "$last_step" ]]; then
     say "Keshet is $(step_label "$step")..."

@@ -10,6 +10,7 @@
     "steiger": "steiger ./src",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "validate:parity": "bash plugins/auto-deployment/scripts/validate-parity.sh",
     "embed:add": "node scripts/embed-add.mjs",
     "embed:check": "node scripts/embed-check.mjs"
   },

@@ -14,9 +14,10 @@ deploy operation, no checkName, secret values as env maps
 (shared/stage/prod), files as a list of path+encoding+content entries,
 .env in the mandatory exclusion set, and no APP_EXISTS_OWNED_BY_YOU code.
 Schema: platform/schemas/verifier-signoff.schema.json. ITCC:
-docs/ITCC_FORM_INPUT_OUTPUT.md. Send tooling: scripts/send-deploy.sh in
-this plugin - device-code sign-in via the API's own endpoints, refusal
-mapping to plain language, distinct exit codes.
+docs/ITCC_FORM_INPUT_OUTPUT.md. Send tooling: scripts/send-deploy.sh
+(macOS/Linux) and scripts/send-deploy.ps1 (Windows) in this plugin -
+device-code sign-in via the API's own endpoints, refusal mapping to plain
+language, distinct exit codes shared by both.
 Sign-in: FR-BR-23 (the builder's own token, acquired through the service's
 device sign-in; the send tooling owns it end to end and the token lives
 only inside the tooling's process) and FR-BR-24. One app registration is
@@ -247,9 +248,17 @@ The request carries:
 
 ### Running the send tooling
 
-The send tooling ships with this plugin. Write the sign-off record from
-step 4 to a JSON file **outside the app folder** - inside it, the file would
-change the very tree it signs - then run:
+The send tooling ships with this plugin, once per operating system: the
+same tooling, the same behaviour, the same exit codes. Write the sign-off
+record from step 4 to a JSON file **outside the app folder** - inside it,
+the file would change the very tree it signs - then run the one that
+matches the machine. On Windows:
+
+```
+powershell -NoProfile -ExecutionPolicy Bypass -File "${CLAUDE_PLUGIN_ROOT}/scripts/send-deploy.ps1" --signoff <sign-off file> <app folder>
+```
+
+On macOS and Linux:
 
 ```
 bash "${CLAUDE_PLUGIN_ROOT}/scripts/send-deploy.sh" --signoff <sign-off file> <app folder>
