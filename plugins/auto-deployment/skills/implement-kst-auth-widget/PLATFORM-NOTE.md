@@ -73,10 +73,12 @@ after.
 Already recorded in MVP_requirements §3 as confirmed - do not re-request from
 Keshet:
 
-- the widget bundle is at `https://app.keshet-tv.com/widgets/kst.auth.widget.js`,
-  one URL, one environment, no dev/stage/prod switch
-- the auth API scope is `api://061fb9ea-aac5-40c6-a1ea-b9681da5a367/.default`,
-  a single app registration fronting the API in every environment
+- the widget bundle is at `https://app-stage.keshet-tv.com/widgets/kst.auth.widget.js`,
+  one URL, no dev/stage/prod switch
+- the auth API scope is per environment: stage (deployed apps) is
+  `api://39f9ffc3-ca80-4a61-bb84-ee283b46fcf3/.default`, prod is
+  `api://eb246617-67aa-485f-8744-b83e79f19064/.default`, and
+  `api://061fb9ea-aac5-40c6-a1ea-b9681da5a367/.default` is the local dev API only
 - the API derives the environment from `azure-app-id`, and Keshet's app
   registrations are per environment
 - the widget is an Angular Elements custom element using Shadow DOM, with its

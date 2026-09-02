@@ -16,10 +16,10 @@ attributes, and (3) — when the host app already signs users in — hand the wi
 user isn't asked to log in twice. This skill provides the best-practice wrapper for React 19+,
 which supports custom elements natively.
 
-**There is exactly one environment.** One bundle, one API instance, one URL:
+**There is exactly one bundle.** One script, one URL:
 
 ```
-https://app.keshet-tv.com/widgets/kst.auth.widget.js
+https://app-stage.keshet-tv.com/widgets/kst.auth.widget.js
 ```
 
 Do not build a dev/stage/prod URL switch, an `env` prop, or a `scriptSrc` override — there is
@@ -60,11 +60,17 @@ the auth-API's own app registration**. There are two ways to get one:
 So: **if the host app uses MSAL, wire up `getToken`.** Only fall back to the widget's own login
 for hosts that have no Azure AD session of their own.
 
-The scope to request is a constant — one app registration fronts the API in every environment:
+The scope to request is the auth-API app registration of the environment the app talks to.
+Deployed apps talk to stage:
 
 ```
-api://061fb9ea-aac5-40c6-a1ea-b9681da5a367/.default
+api://39f9ffc3-ca80-4a61-bb84-ee283b46fcf3/.default   # stage (deployed apps)
+api://eb246617-67aa-485f-8744-b83e79f19064/.default   # prod
+api://061fb9ea-aac5-40c6-a1ea-b9681da5a367/.default   # local dev API only
 ```
+
+A token minted for the wrong audience is rejected by the API, and requesting an unconsented
+scope makes MSAL's redirect flow fail outright - so this GUID must match the deployed API.
 
 Typical host wiring with `@azure/msal-react`:
 
@@ -73,7 +79,7 @@ import { useCallback } from 'react';
 import { useMsal } from '@azure/msal-react';
 import { KstAuthWidget } from './kst-auth-widget/KstAuthWidget';
 
-const AUTH_API_SCOPE = 'api://061fb9ea-aac5-40c6-a1ea-b9681da5a367/.default';
+const AUTH_API_SCOPE = 'api://39f9ffc3-ca80-4a61-bb84-ee283b46fcf3/.default'; // stage auth API
 
 export function PermissionsPage() {
   const { instance, accounts } = useMsal();
@@ -173,7 +179,7 @@ single audience. Flag this to the user; it usually needs someone with tenant adm
 
 | Mistake | Fix |
 |---------|-----|
-| Adding an `env` prop or dev/stage/prod URL map | There is one bundle at `https://app.keshet-tv.com/widgets/kst.auth.widget.js`. The environment follows from `azure-app-id`. |
+| Adding an `env` prop or dev/stage/prod URL map | There is one bundle at `https://app-stage.keshet-tv.com/widgets/kst.auth.widget.js`. The environment follows from `azure-app-id`. |
 | Skipping `getToken` in an app that already uses MSAL | The user gets a second login popup for an identity they've already provided. Wire the provider. |
 | Passing `getToken` as an attribute, or dash-cased | It's a property, camelCase: `getToken={fn}`. |
 | Resolving the token once and returning the cached string | The provider is called per request precisely so the token can be renewed. Return a fresh one each call. |
