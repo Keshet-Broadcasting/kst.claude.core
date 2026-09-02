@@ -330,11 +330,28 @@ say "Waiting for the sign-in to finish..."
 TOKEN=""
 BUILDER_NAME="the builder"
 deadline=$(( $(date +%s) + EXPIRES_IN ))
+# The wait must never fall silent: a heartbeat shows the sign-in window is
+# still open, and a run of failed polls is said out loud instead of being
+# indistinguishable from a builder who has not signed in yet.
+last_heartbeat=$(( $(date +%s) ))
+poll_errors=0
 while (( $(date +%s) < deadline )); do
   sleep "$INTERVAL"
-  POLL="$(printf '%s' "$DEVICE_CODE" | jq -cRs '{deviceCode: .}' \
+  now=$(( $(date +%s) ))
+  if (( now - last_heartbeat >= 30 )); then
+    say "Still waiting for the sign-in - about $(( (deadline - now + 59) / 60 )) minute(s) left on this code."
+    last_heartbeat=$now
+  fi
+  if ! POLL="$(printf '%s' "$DEVICE_CODE" | jq -cRs '{deviceCode: .}' \
     | curl -sS --max-time 30 -X POST -H 'Content-Type: application/json' \
-        --data-binary @- "$BASE_URL/api/apps/auth/device-token")" || continue
+        --data-binary @- "$BASE_URL/api/apps/auth/device-token")"; then
+    poll_errors=$((poll_errors + 1))
+    if (( poll_errors == 6 )); then
+      say "Having trouble reaching Keshet while waiting for the sign-in - still trying. If this keeps up, the network is the problem, not the sign-in."
+    fi
+    continue
+  fi
+  poll_errors=0
   STATUS="$(jq -r '.status // empty' <<<"$POLL" 2>/dev/null || true)"
   if [[ "$STATUS" == "authenticated" ]]; then
     TOKEN="$(jq -r '.accessToken' <<<"$POLL")"

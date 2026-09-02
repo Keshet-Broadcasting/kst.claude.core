@@ -431,11 +431,29 @@ Say 'Waiting for the sign-in to finish...'
 $Token = ''
 $BuilderName = 'the builder'
 $deadline = [DateTimeOffset]::UtcNow.AddSeconds($ExpiresIn)
+# The wait must never fall silent: a heartbeat shows the sign-in window is
+# still open, and a run of failed polls is said out loud instead of being
+# indistinguishable from a builder who has not signed in yet.
+$lastHeartbeat = [DateTimeOffset]::UtcNow
+$pollErrors = 0
 while ([DateTimeOffset]::UtcNow -lt $deadline) {
   Start-Sleep -Seconds $Interval
+  $now = [DateTimeOffset]::UtcNow
+  if (($now - $lastHeartbeat).TotalSeconds -ge 30) {
+    $minutesLeft = [Math]::Ceiling(($deadline - $now).TotalMinutes)
+    Say "Still waiting for the sign-in - about $minutesLeft minute(s) left on this code."
+    $lastHeartbeat = $now
+  }
   $pollBody = @{ deviceCode = $DeviceCode } | ConvertTo-Json -Compress
   $r = Invoke-Api -Method POST -Path '/api/apps/auth/device-token' -Body $pollBody -TimeoutSec 30
-  if ($r.Status -eq 0) { continue }
+  if ($r.Status -eq 0) {
+    $pollErrors++
+    if ($pollErrors -eq 6) {
+      Say 'Having trouble reaching Keshet while waiting for the sign-in - still trying. If this keeps up, the network is the problem, not the sign-in.'
+    }
+    continue
+  }
+  $pollErrors = 0
   $poll = ConvertFrom-JsonSafe $r.Body
   $status = Get-JsonField $poll 'status'
   if ($status -eq 'authenticated') {
