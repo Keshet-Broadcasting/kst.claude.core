@@ -8,11 +8,11 @@ import { KstAuthWidget } from '@/shared/embeds';
 import styles from './AccessPanel.module.css';
 
 /**
- * The scope that produces a token `kst.auth.api` accepts. One app registration fronts the
- * auth API in every environment, so this is a constant, not configuration - the environment
- * is derived from `azure-app-id`, never from the scope or the bundle URL.
+ * The scope that produces a token `kst.auth.api` accepts. Each auth-API environment has its
+ * own app registration; deployed apps talk to stage, so this is the stage audience. The data
+ * environment (which app's users are managed) is still derived from `azure-app-id`.
  */
-const AUTH_API_SCOPE = 'api://061fb9ea-aac5-40c6-a1ea-b9681da5a367/.default';
+const AUTH_API_SCOPE = 'api://39f9ffc3-ca80-4a61-bb84-ee283b46fcf3/.default';
 
 interface AccessPanelProps {
   /**
