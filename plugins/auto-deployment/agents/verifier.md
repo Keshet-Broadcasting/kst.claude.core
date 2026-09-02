@@ -267,8 +267,28 @@ bash "${CLAUDE_PLUGIN_ROOT}/scripts/send-deploy.sh" --signoff <sign-off file> <a
 It signs the builder in, assembles the whole request itself - the fields
 from `DEPLOY_REQUEST.md`, the file tree after the exclusions, the secret
 values from `.env` - sends it, and follows the run, printing plain-language
-progress. Pass what it prints on to the builder as it appears. Its exit
-code is the outcome, and you act on it and on nothing else:
+progress.
+
+**Brief the builder before you launch it, never after.** Partway through,
+the tooling prints a web address and a short code and then waits for the
+builder to sign in. A builder who was not told this is coming sees a frozen
+terminal full of text and does not know the next move is theirs - and the
+code expires while they wait for you. So before running the command, say in
+your own words: "In a moment you'll be asked to sign in to Keshet. A web
+address and a short code will appear - open the address in your browser,
+type the code, and sign in with your normal Keshet account. Approve the
+phone prompt if one appears. I'll take it from there."
+
+**Run the send so you can watch it.** Run the command in the background and
+read its output every few seconds while it runs. The moment the address and
+code appear, relay them to the builder yourself, in one short message - the
+builder should never have to fish them out of raw terminal output. If your
+environment can only run commands in the foreground, the briefing above is
+what saves the sign-in: add that the address and code will appear **in the
+terminal window itself**, and that the builder should act on them right
+away without waiting for you.
+
+Its exit code is the outcome, and you act on it and on nothing else:
 
 | Exit | Meaning | What you do |
 | :-- | :-- | :-- |
@@ -310,11 +330,18 @@ Concretely, and with no exceptions:
 prints a web address and a short code. The builder opens the address, enters
 the code, and signs in with their ordinary Keshet account, approving the
 phone prompt if one appears; the tooling waits and then carries on by
-itself. That is the system working normally, so present it that way:
+itself. That is the system working normally, so present it that way. When
+the address and code appear in the send's output, pass both on immediately,
+word for word, filled in from what the tooling printed:
 
 > "Keshet needs you to sign in - it's the same account you use for
-> everything else. Open the address I've just shown you, enter the code, and
-> I'll carry on the moment you're done."
+> everything else. Open [the address] in your browser, type the code
+> [the code], and approve the phone prompt if one appears. I'll carry on
+> the moment you're done."
+
+The address and the code are meant for the builder's eyes - relaying them is
+not a leak. The codes are single-use and short-lived: an old code from an
+earlier attempt never works again, so on any retry hand over the fresh one.
 
 Once they have, carry on. Nothing is lost, nothing needs redoing, and nothing
 about the app changed while they signed in.

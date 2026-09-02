@@ -402,7 +402,9 @@ if ($r.Status -eq 0) {
 # Sign the builder in (device sign-in via the service's own endpoints)
 # --------------------------------------------------------------------------
 Say 'Keshet needs the builder to sign in before the app can be sent.'
-$r = Invoke-Api -Method POST -Path '/api/apps/auth/device-code' -TimeoutSec 30
+# IIS (http.sys) rejects body-less POSTs with HTTP 411, so send an empty
+# JSON body even though the endpoint takes no input (parity with send-deploy.sh).
+$r = Invoke-Api -Method POST -Path '/api/apps/auth/device-code' -Body '{}' -TimeoutSec 30
 if ($r.Status -eq 0) {
   Fail $EXIT_UNREACHABLE 'The connection to Keshet dropped while starting the sign-in. It is safe to run the send again.'
 }

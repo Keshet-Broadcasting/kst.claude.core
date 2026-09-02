@@ -309,7 +309,9 @@ curl -sS --max-time 10 -o /dev/null "$BASE_URL/api/monitor/check" 2>/dev/null \
 # Sign the builder in (device sign-in via the service's own endpoints)
 # --------------------------------------------------------------------------
 say "Keshet needs the builder to sign in before the app can be sent."
-START="$(curl -sS --max-time 30 -X POST "$BASE_URL/api/apps/auth/device-code")" \
+# IIS (http.sys) rejects body-less POSTs with HTTP 411, so send an empty
+# JSON body even though the endpoint takes no input.
+START="$(curl -sS --max-time 30 -X POST -H 'Content-Type: application/json' -d '{}' "$BASE_URL/api/apps/auth/device-code")" \
   || fail "$EXIT_UNREACHABLE" "The connection to Keshet dropped while starting the sign-in. It is safe to run the send again."
 DEVICE_CODE="$(jq -r '.deviceCode // empty' <<<"$START" 2>/dev/null || true)"
 [[ -n "$DEVICE_CODE" ]] \
