@@ -192,6 +192,41 @@ if command -v node >/dev/null 2>&1; then
   node "$SEND_MJS" "$PROBE_DIR" >/dev/null 2>&1
   [[ $? -eq 1 ]] && pass "missing DEPLOY_REQUEST.md exits 1" || fail "missing DEPLOY_REQUEST.md does not exit 1"
   rm -rf "$PROBE_DIR"
+
+  # The stamped blocks: Keshet rewrites the Requester and sign-off lines and
+  # can only rewrite a line that exists, so the send refuses a request that
+  # lacks them before anything leaves the machine.
+  TEMPLATE="${PLUGIN_DIR}/templates/DEPLOY_REQUEST.md"
+  if [[ -f "$TEMPLATE" ]]; then
+    pass "templates/DEPLOY_REQUEST.md ships with the plugin"
+    for field in app-name purpose description tags data-sources audience-type \
+                 audience-members declared-secrets requested-by-upn \
+                 requested-by-object-id broker-verified-at verifier-signoff; do
+      grep -qE "^${field}:" "$TEMPLATE" \
+        && pass "template carries '${field}'" \
+        || fail "template lacks the gate-required field '${field}'"
+    done
+    PROBE_DIR="$(mktemp -d)"
+    sed -e 's/^app-name: CHANGE-ME/app-name: probe-app/' \
+        -e 's/^purpose: CHANGE-ME/purpose: probe/' \
+        -e 's/^description: CHANGE-ME/description: probe/' \
+        -e 's/^tags: CHANGE-ME/tags: probe/' \
+        -e 's/^data-sources: CHANGE-ME/data-sources: none/' \
+        -e 's/^audience-type: CHANGE-ME/audience-type: individuals/' \
+        -e 's/^audience-members: CHANGE-ME/audience-members: probe@example.com/' \
+        "$TEMPLATE" | grep -vE '^(requested-by-upn|requested-by-object-id|broker-verified-at|verifier-signoff):' \
+        > "${PROBE_DIR}/DEPLOY_REQUEST.md"
+    out="$(node "$SEND_MJS" "$PROBE_DIR" 2>&1)"
+    rc=$?
+    if [[ $rc -eq 1 ]] && grep -q 'requested-by-upn' <<<"$out"; then
+      pass "request without the stamped blocks exits 1 and names the missing lines"
+    else
+      fail "request without the stamped blocks: exit ${rc}, output: ${out:-<none>}"
+    fi
+    rm -rf "$PROBE_DIR"
+  else
+    fail "templates/DEPLOY_REQUEST.md is missing from the plugin"
+  fi
 fi
 
 if grep -q 'itccId' "$SEND_MJS" && grep -q 'ITCC case:' "$SEND_MJS"; then

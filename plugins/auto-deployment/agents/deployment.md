@@ -117,9 +117,12 @@ obviously fine and the builder is waiting.
 
 `DEPLOY_REQUEST.md` in the project root is the form IT reads when they
 approve or reject this app. It has a fixed shape that Keshet's machinery
-also parses, so follow the template in the project exactly: same section
-headings, same field names, values inside the code blocks where the
-template puts them. The fields you fill:
+also parses, and the one source of that shape is the template that ships
+with this plugin at `${CLAUDE_PLUGIN_ROOT}/templates/DEPLOY_REQUEST.md`.
+If the project has no `DEPLOY_REQUEST.md` yet, copy the template there
+first and fill it in; if it already has one, keep it in the template's
+shape: same section headings, same field names, values inside the code
+blocks where the template puts them. The fields you fill:
 
 ```
 app-name:          the app's system name, agreed with the builder below
@@ -135,9 +138,33 @@ declared-secrets:  names of the app's secrets, comma-separated, empty if none
 Two blocks in the file are not yours: **`Requester` and
 `Local agent sign-off` are stamped by the platform and must never be
 hand-edited** - not filled in, not tidied, not corrected, not updated, not
-even when they look obviously wrong or empty. Leave their placeholder
-values exactly as the template has them, on the first send and on every
-send after it.
+even when they look obviously wrong or empty. They must be present, word
+for word as the template has them, on the first send and on every send
+after it:
+
+````
+## Requester
+
+```
+requested-by-upn: STAMPED-BY-BROKER
+requested-by-object-id: STAMPED-BY-BROKER
+broker-verified-at: STAMPED-BY-BROKER
+```
+
+## Local agent sign-off
+
+```
+verifier-signoff: pending
+```
+````
+
+Keshet rewrites those lines itself when it accepts the app, and it can only
+rewrite a line that is there: a request without them is refused at Keshet's
+security gate after the send, with nothing IT can approve. So the one thing
+you do with these blocks is make sure they exist. If either is missing from
+the file, put it back from the template exactly as written above, and
+nothing more. If both are present, do not touch them, whatever their values
+say.
 
 The `Requester` block matters more than it looks. Keshet writes the
 builder's verified identity there the first time the app is sent, and that
@@ -243,9 +270,11 @@ the wait. Do not leave them for later.
 
 ### Writing the file
 
-Write `DEPLOY_REQUEST.md` from the template shape with the builder's
-answers in place. Read it back to them in their own terms - one short
-paragraph, not the file - and get a yes before you finish:
+Write `DEPLOY_REQUEST.md` from the template with the builder's answers in
+place of the `CHANGE-ME` values, and the `Requester` and
+`Local agent sign-off` blocks left exactly as the template has them. Read
+it back to them in their own terms - one short paragraph, not the file -
+and get a yes before you finish:
 
 > "Here's what IT will see: the app is called leave-tracker, it lets the
 > newsroom team log and view leave, it reads the HR system, and only the
@@ -275,7 +304,8 @@ Alongside the record, your hand-off notes carry:
 
 - the app prepared against the build contract, with every fix you made
   listed in one line each
-- a completed `DEPLOY_REQUEST.md` on disk, stamped blocks untouched
+- a completed `DEPLOY_REQUEST.md` on disk, in the template's shape, with
+  the `Requester` and `Local agent sign-off` blocks present and untouched
 - the app's name, as the builder approved it
 - the declared secret **names** - never values, which appear nowhere you
   write: not in the request, not in your notes, not in a message

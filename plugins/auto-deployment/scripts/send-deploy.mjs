@@ -164,6 +164,26 @@ requireField('data-sources', DATA_SOURCES);
 requireField('audience-type', AUDIENCE_TYPE);
 requireField('audience-members', AUDIENCE_MEMBERS);
 
+// The Requester and Local agent sign-off blocks are stamped by Keshet, and
+// Keshet can only rewrite a line that already exists. A request sent without
+// these lines is accepted here and then refused at the platform's security
+// gate, after the send, with nothing IT can approve - so it is refused before
+// anything leaves the machine instead. Presence is the whole check: the
+// values are placeholders until Keshet stamps them, and are never judged here.
+const STAMPED_FIELDS = [
+  'requested-by-upn',
+  'requested-by-object-id',
+  'broker-verified-at',
+  'verifier-signoff',
+];
+{
+  const missingStamped = STAMPED_FIELDS.filter((name) => !reqLines.some((l) => l.startsWith(`${name}:`)));
+  if (missingStamped.length > 0) {
+    fail(EXIT_LOCAL,
+      `The deployment details are missing the lines Keshet stamps (${missingStamped.join(', ')}), so nothing was sent. The Requester and Local agent sign-off blocks need restoring from the deployment request template, exactly as the template has them, before the app can go to Keshet.`);
+  }
+}
+
 // The IT review form asks for the audience and the kind of information the
 // app handles; both are answered from the request file, in words a reviewer
 // can judge. Apps on this platform are only ever opened by the named Keshet
