@@ -104,77 +104,101 @@ fi
 
 # ---------------------------------------------------------------------------
 echo ""
-echo "=== 2. Send tooling: exit codes ==="
+echo "=== 2. Send tooling: one implementation, two launchers ==="
 # ---------------------------------------------------------------------------
-# The verifier acts on the exit code and nothing else, so the two
-# implementations must agree on every one of them.
+SEND_MJS="${SCRIPT_DIR}/send-deploy.mjs"
+
+if ! command -v node >/dev/null 2>&1; then
+  fail "node is required (the hooks dispatcher and the send both run on it)"
+elif node --check "$SEND_MJS" >/dev/null 2>&1; then
+  pass "send-deploy.mjs parses (node --check)"
+else
+  fail "send-deploy.mjs does not parse"
+fi
+
+# The verifier acts on the exit code and nothing else; the .mjs owns them.
 for pair in "EXIT_LOCAL 1" "EXIT_REFUSED 2" "EXIT_UNREACHABLE 3" "EXIT_SIGNIN 4"; do
   name="${pair% *}"
   value="${pair#* }"
-  if grep -qE "^readonly ${name}=${value}\$" "$SEND_SH"; then
-    pass "send-deploy.sh: ${name}=${value}"
+  if grep -qE "^const ${name} = ${value};\$" "$SEND_MJS"; then
+    pass "send-deploy.mjs: ${name} = ${value}"
   else
-    fail "send-deploy.sh does not define ${name}=${value}"
-  fi
-  if grep -qE "^\\\$${name} = ${value}\$" "$SEND_PS1"; then
-    pass "send-deploy.ps1: \$${name} = ${value}"
-  else
-    fail "send-deploy.ps1 does not define \$${name} = ${value}"
+    fail "send-deploy.mjs does not define ${name} = ${value}"
   fi
 done
+
+# The launchers must hand over to the one implementation and carry none of
+# their own send logic - duplicated logic is what drifts.
+for f in "$SEND_SH" "$SEND_PS1"; do
+  ok=1
+  grep -q 'send-deploy\.mjs' "$f" || { fail "$(basename "$f") does not launch send-deploy.mjs"; ok=0; }
+  grep -qE 'device-code|/api/apps' "$f" && { fail "$(basename "$f") carries send logic of its own instead of launching the .mjs"; ok=0; }
+  [[ $ok -eq 1 ]] && pass "$(basename "$f") is a thin launcher for send-deploy.mjs"
+done
+if bash -n "$SEND_SH" 2>/dev/null; then
+  pass "send-deploy.sh parses (bash -n)"
+else
+  fail "send-deploy.sh does not parse"
+fi
 
 # ---------------------------------------------------------------------------
 echo ""
 echo "=== 3. Send tooling: config keys and environment overrides ==="
 # ---------------------------------------------------------------------------
 for key in apiBaseUrl maxFiles maxBytes count intervalSeconds directories files; do
-  ok=1
-  grep -q "$key" "$SEND_SH" || { fail "send-deploy.sh never reads config key '$key'"; ok=0; }
-  grep -q "$key" "$SEND_PS1" || { fail "send-deploy.ps1 never reads config key '$key'"; ok=0; }
-  [[ $ok -eq 1 ]] && pass "both send scripts read config key '$key'"
+  if grep -q "$key" "$SEND_MJS"; then
+    pass "send-deploy.mjs reads config key '$key'"
+  else
+    fail "send-deploy.mjs never reads config key '$key'"
+  fi
 done
 
 for var in KST_AUTH_API_BASE_URL KST_DEPLOY_MAX_FILES KST_DEPLOY_MAX_BYTES \
            KST_DEPLOY_POLL_COUNT KST_DEPLOY_POLL_INTERVAL; do
-  ok=1
-  grep -q "$var" "$SEND_SH" || { fail "send-deploy.sh does not honour the $var override"; ok=0; }
-  grep -q "$var" "$SEND_PS1" || { fail "send-deploy.ps1 does not honour the $var override"; ok=0; }
-  [[ $ok -eq 1 ]] && pass "both send scripts honour the $var override"
+  if grep -q "$var" "$SEND_MJS"; then
+    pass "send-deploy.mjs honours the $var override"
+  else
+    fail "send-deploy.mjs does not honour the $var override"
+  fi
 done
 
 # The built-in fallbacks (used when the config file is absent) must match the
 # config file's own values, or the two "defaults" drift apart.
-if grep -q "maxFiles' 2000" "$SEND_SH" && grep -q "'maxFiles') 2000" "$SEND_PS1"; then
-  pass "both send scripts fall back to 2000 files"
-else
-  fail "the 2000-file fallback is not present in both send scripts"
-fi
-if grep -qE "10 \* 1024 \* 1024" "$SEND_SH" && grep -qE "10 \* 1024 \* 1024" "$SEND_PS1"; then
-  pass "both send scripts fall back to the 10 MB ceiling"
-else
-  fail "the 10 MB fallback is not present in both send scripts"
-fi
-if grep -q "count' 60" "$SEND_SH" && grep -q "'count') 60" "$SEND_PS1"; then
-  pass "both send scripts fall back to 60 polls"
-else
-  fail "the 60-poll fallback is not present in both send scripts"
-fi
-if grep -q "intervalSeconds' 5" "$SEND_SH" && grep -q "'intervalSeconds') 5" "$SEND_PS1"; then
-  pass "both send scripts fall back to a 5s poll interval"
-else
-  fail "the 5s poll interval fallback is not present in both send scripts"
-fi
+grep -q "'maxFiles'], 2000" "$SEND_MJS" \
+  && pass "send-deploy.mjs falls back to 2000 files" \
+  || fail "the 2000-file fallback is not present in send-deploy.mjs"
+grep -qE "10 \* 1024 \* 1024" "$SEND_MJS" \
+  && pass "send-deploy.mjs falls back to the 10 MB ceiling" \
+  || fail "the 10 MB fallback is not present in send-deploy.mjs"
+grep -q "'count'], 60" "$SEND_MJS" \
+  && pass "send-deploy.mjs falls back to 60 polls" \
+  || fail "the 60-poll fallback is not present in send-deploy.mjs"
+grep -q "'intervalSeconds'], 5" "$SEND_MJS" \
+  && pass "send-deploy.mjs falls back to a 5s poll interval" \
+  || fail "the 5s poll interval fallback is not present in send-deploy.mjs"
 
 # ---------------------------------------------------------------------------
 echo ""
-echo "=== 4. Send tooling: ITCC case id ==="
+echo "=== 4. Send tooling: behaviour probes and the ITCC case id ==="
 # ---------------------------------------------------------------------------
-for f in "$SEND_SH" "$SEND_PS1"; do
-  ok=1
-  grep -q 'itccId' "$f" || { fail "$(basename "$f") never reads itccId from the run payload"; ok=0; }
-  grep -q 'ITCC case:' "$f" || { fail "$(basename "$f") never prints the ITCC case line"; ok=0; }
-  [[ $ok -eq 1 ]] && pass "$(basename "$f") reads itccId and prints 'ITCC case:'"
-done
+# The exit-code contract, exercised rather than grepped: local-input problems
+# must exit 1 before anything is sent.
+if command -v node >/dev/null 2>&1; then
+  node "$SEND_MJS" /nonexistent-app-folder >/dev/null 2>&1
+  [[ $? -eq 1 ]] && pass "missing app folder exits 1" || fail "missing app folder does not exit 1"
+  node "$SEND_MJS" --bogus-option >/dev/null 2>&1
+  [[ $? -eq 1 ]] && pass "unknown option exits 1" || fail "unknown option does not exit 1"
+  PROBE_DIR="$(mktemp -d)"
+  node "$SEND_MJS" "$PROBE_DIR" >/dev/null 2>&1
+  [[ $? -eq 1 ]] && pass "missing DEPLOY_REQUEST.md exits 1" || fail "missing DEPLOY_REQUEST.md does not exit 1"
+  rm -rf "$PROBE_DIR"
+fi
+
+if grep -q 'itccId' "$SEND_MJS" && grep -q 'ITCC case:' "$SEND_MJS"; then
+  pass "send-deploy.mjs reads itccId and prints 'ITCC case:'"
+else
+  fail "send-deploy.mjs never surfaces the ITCC case id"
+fi
 
 # ---------------------------------------------------------------------------
 echo ""
