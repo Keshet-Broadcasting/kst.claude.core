@@ -18,7 +18,7 @@ const ELEMENT_NAME = 'kst-auth-widget';
  * deployment and derives the environment from the `azure-app-id` the widget is given,
  * so this URL is the same for every host and every environment.
  */
-export const WIDGET_SCRIPT_SRC = 'https://app.keshet-tv.com/widgets/kst.auth.widget.js';
+export const WIDGET_SCRIPT_SRC = 'https://app-stage.keshet-tv.com/widgets/kst.auth.widget.js';
 
 // One in-flight/settled promise, shared across all hook instances.
 let loader: Promise<void> | null = null;

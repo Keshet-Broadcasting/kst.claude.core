@@ -1,11 +1,15 @@
 {
   "tagName": "kst-auth-widget",
   "urls": {
-    "development": "https://app.keshet-tv.com/widgets/kst.auth.widget.js",
-    "staging": "https://app.keshet-tv.com/widgets/kst.auth.widget.js",
-    "production": "https://app.keshet-tv.com/widgets/kst.auth.widget.js"
+    "development": "https://app-stage.keshet-tv.com/widgets/kst.auth.widget.js",
+    "staging": "https://app-stage.keshet-tv.com/widgets/kst.auth.widget.js",
+    "production": "https://app-stage.keshet-tv.com/widgets/kst.auth.widget.js"
   },
-  "allowedProps": ["azure-app-id", "theme", "getToken"],
+  "allowedProps": [
+    "azure-app-id",
+    "theme",
+    "getToken"
+  ],
   "forbiddenProps": [],
   "templateVersion": "1.0.0"
 }
