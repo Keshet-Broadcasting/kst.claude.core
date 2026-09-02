@@ -103,10 +103,16 @@ while (($#)); do
   esac
 done
 
-for cmd in curl jq; do
-  command -v "$cmd" >/dev/null 2>&1 \
-    || fail "$EXIT_LOCAL" "The send tooling needs '$cmd' on this machine and could not find it, so nothing was sent."
+# Every external tool the script touches, checked up front and reported in
+# one breath - a minimal shell (a sandbox, a slim container) must fail here
+# with a full list, never halfway through a send with a cryptic one-liner.
+# iconv is deliberately absent: it is optional, see is_binary below.
+MISSING_TOOLS=()
+for cmd in curl jq grep sed cut tr head date mktemp find wc base64 sleep dirname basename; do
+  command -v "$cmd" >/dev/null 2>&1 || MISSING_TOOLS+=("$cmd")
 done
+((${#MISSING_TOOLS[@]} == 0)) \
+  || fail "$EXIT_LOCAL" "The send tooling needs these standard tools and could not find them: ${MISSING_TOOLS[*]}. Nothing was sent - this shell is missing pieces the send relies on, and that is a platform problem to report, not something the builder did."
 
 [[ -d "$APP_DIR" ]] || fail "$EXIT_LOCAL" "The app folder was not found, so nothing was sent."
 APP_DIR="$(cd "$APP_DIR" && pwd)"
@@ -206,13 +212,22 @@ FILES_NDJSON="$WORK_DIR/files.ndjson"
 
 # A file is sent base64-encoded when it is not clean UTF-8 text: either it
 # contains NUL bytes or it does not decode as UTF-8. Everything else - code,
-# Hebrew text included - travels as utf-8.
+# Hebrew text included - travels as utf-8. Only tools from the required list
+# above are used; iconv is optional, and on a shell without it every file
+# that is not proven text is sent base64 - the service decodes base64 to
+# the identical bytes, so the send stays correct and only grows in size.
+HAVE_ICONV=0
+command -v iconv >/dev/null 2>&1 && HAVE_ICONV=1
 is_binary() {
   [[ -s "$1" ]] || return 1
-  if ! LC_ALL=C tr -d '\0' < "$1" | cmp -s - "$1"; then
+  local nuls
+  nuls="$(LC_ALL=C tr -dc '\0' < "$1" | wc -c | tr -d '[:space:]')"
+  (( nuls > 0 )) && return 0
+  if (( HAVE_ICONV )); then
+    ! iconv -f UTF-8 -t UTF-8 < "$1" > /dev/null 2>&1
+  else
     return 0
   fi
-  ! iconv -f UTF-8 -t UTF-8 < "$1" > /dev/null 2>&1
 }
 
 file_count=0
