@@ -99,7 +99,7 @@ There is no `git push` to Keshet and there is no GitHub. **The deployment servic
 - Never log a secret, and never put one in an error message. Log that a connection succeeded, not what it connected with.
 - Never edit `azure-pipelines.yml` by hand. It is the app's only connection to the platform's security gate; editing it cannot weaken the gate - it can only stop the app deploying at all.
 - Never write a `Dockerfile` expecting it to be used. The platform supplies its own and ignores yours by design.
-- Never hand-edit the `Requester` or `Local agent sign-off` blocks in `DEPLOY_REQUEST.md`. Both are stamped, and both are re-checked server-side. The `Requester` block is more than a record: it is how Keshet recognises, on every later send, that this app belongs to this user - so editing it can cost them ownership of their own app, not merely fail a check.
+- Never hand-edit the `Requester` or `Local agent sign-off` blocks in `DEPLOY_REQUEST.md`. Both come verbatim from the auto-deployment plugin's `templates/DEPLOY_REQUEST.md`, both must be present on every send (Keshet can only stamp a line that exists), both are stamped, and both are re-checked server-side. The `Requester` block is more than a record: it is how Keshet recognises, on every later send, that this app belongs to this user - so editing it can cost them ownership of their own app, not merely fail a check.
 
 # Embeds — HARD RULE, no exceptions
 

@@ -123,11 +123,18 @@ finished - hand back to it rather than letting a request Keshet will refuse
 travel further down the chain.
 
 The `Requester` and `Local agent sign-off` blocks are different: they are
-stamped by the platform, not filled by anyone here. If they still say
-`STAMPED-BY-BROKER` and `STAMPED-BY-VERIFIER` where the platform stamps them,
-that is correct at this stage. **Never edit those blocks yourself, and never
-let anyone else edit them** - a hand-edited stamp fails Keshet's checks rather
-than passing them.
+stamped by the platform, not filled by anyone here. Both must be present,
+exactly as the plugin's template (`${CLAUDE_PLUGIN_ROOT}/templates/DEPLOY_REQUEST.md`)
+has them: a `Requester` block whose three lines - `requested-by-upn`,
+`requested-by-object-id`, `broker-verified-at` - each read
+`STAMPED-BY-BROKER`, and a `Local agent sign-off` block whose one line,
+`verifier-signoff`, reads `pending`. Those placeholder values are correct at
+this stage; Keshet rewrites the lines itself when it accepts the app. If
+either block is missing, the deployment agent has not finished - hand back to
+it to restore the block from the template, because Keshet can only stamp a
+line that exists and refuses a request without them. **Never edit those
+blocks yourself, and never let anyone else edit them** - a hand-edited stamp
+fails Keshet's checks rather than passing them.
 
 ## 3. The description and tags are real
 
@@ -204,7 +211,7 @@ findings: <empty if everything is ready; otherwise one entry per problem,
 **Approved means, and only means:** the builder has approved the app's name and
 that name is written into the deployment request, every field of the request
 carries a real answer - the description and tags included - and the stamped
-blocks are untouched. That record is what tells the verifier the request is
+blocks are present and untouched. That record is what tells the verifier the request is
 ready to send; the verifier makes the one request that sends it, and its answer
 is the answer.
 
