@@ -29,6 +29,11 @@
 //   3  unreachable - network or service trouble; safe to run again
 //   4  sign-in failed or timed out
 //
+// Every failure says what happened in plain language and then ends with the
+// endpoint, the HTTP status and the base URL that was used - a builder pastes
+// the whole message into a report, and the platform team has to be able to
+// tell an outage from a send aimed at the wrong instance without being there.
+//
 // Secrets: values are read from .env straight into the request body held in
 // memory. They are never printed, never logged, and never written to disk.
 // Sign-in tokens stay in local variables and are never echoed.
@@ -326,9 +331,13 @@ const payload = {
 };
 
 // --------------------------------------------------------------------------
-// HTTP, without curl: fetch with a timeout. A network-level failure comes
-// back as ok:false with status 0; an HTTP answer of any status comes back
-// with its body already read.
+// HTTP, without curl: fetch with a timeout.
+//
+// Two different questions, two different fields, because conflating them is
+// what made a 404 read as an outage: `reached` says the service answered at
+// all, `ok` says the answer was a success (2xx). A network-level failure
+// comes back with reached:false and status 0; `timedOut` separates a service
+// that never answered from one this machine could not open a connection to.
 // --------------------------------------------------------------------------
 const http = async (method, path, body, timeoutSec, token) => {
   const headers = { 'Content-Type': 'application/json' };
@@ -343,11 +352,36 @@ const http = async (method, path, body, timeoutSec, token) => {
     const text = await res.text();
     let json = null;
     try { json = JSON.parse(text); } catch { json = null; }
-    return { ok: true, status: res.status, json };
-  } catch {
-    return { ok: false, status: 0, json: null };
+    return {
+      reached: true,
+      ok: res.status >= 200 && res.status < 300,
+      status: res.status,
+      json,
+      empty: text.trim() === '',
+      timedOut: false,
+    };
+  } catch (err) {
+    return {
+      reached: false,
+      ok: false,
+      status: 0,
+      json: null,
+      empty: true,
+      timedOut: err?.name === 'TimeoutError',
+    };
   }
 };
+
+// The facts a platform person needs to tell an outage from a wrong address:
+// which endpoint, what it answered, and which instance was asked. Appended to
+// every failure message, after the plain-language part.
+const detail = (path, status, extra = '') =>
+  `Details for the platform team: ${status === 0 ? 'no answer' : `HTTP ${status}`} from ${path} at ${BASE_URL}${extra !== '' ? ` (${extra})` : ''}.`;
+
+const HEALTH_PATH = '/api/monitor/check';
+const DEVICE_CODE_PATH = '/api/apps/auth/device-code';
+const DEVICE_TOKEN_PATH = '/api/apps/auth/device-token';
+const SEND_PATH = '/api/apps';
 
 const jstr = (obj, key) => {
   const v = obj?.[key];
@@ -386,44 +420,49 @@ const refuseStep = (step, msg, runId) => {
     `Something on the Keshet side did not finish while ${stepLabel(step)}. This is not something the builder did, and it is safe to send again in a few minutes. Reference for the platform team: run ${runId || 'unknown'}.`);
 };
 
-const refuseHttp = (status, json) => {
+const refuseHttp = (status, json, path) => {
   const code = jstr(json, 'code');
   const rawMsg = json?.message;
   const msg = Array.isArray(rawMsg) ? rawMsg.join('; ') : (typeof rawMsg === 'string' ? rawMsg : '');
+  const d = detail(path, status, code);
   if (status === 401) {
     fail(EXIT_SIGNIN,
-      'Keshet no longer accepts the sign-in - it has likely expired. Run the send again and sign in when the code appears. Nothing is lost.');
+      `Keshet no longer accepts the sign-in - it has likely expired. Run the send again and sign in when the code appears. Nothing is lost. ${d}`);
   }
   if (status === 403) {
     fail(EXIT_REFUSED,
-      "This account isn't approved to send apps to Keshet yet. Someone from the platform team needs to add it - there is nothing the builder needs to do.");
+      `This account isn't approved to send apps to Keshet yet. Someone from the platform team needs to add it - there is nothing the builder needs to do. ${d}`);
+  }
+  if (status === 404) {
+    fail(EXIT_REFUSED,
+      `Keshet has nothing at the address this request went to, so the app was not taken. That usually means the send is aimed at the wrong service, or at one too old to know this request. It needs the platform team; the builder did nothing wrong. ${d}`);
   }
   if (status === 429) {
     fail(EXIT_REFUSED,
-      'Keshet asked us to slow down because many requests arrived in a short time. Wait a few minutes and send again - nothing is lost.');
+      `Keshet asked us to slow down because many requests arrived in a short time. Wait a few minutes and send again - nothing is lost. ${d}`);
   }
   if (status >= 500) {
     fail(EXIT_UNREACHABLE,
-      "Something on the Keshet side isn't responding right now. This is not something the builder did. It is safe to send again in a few minutes.");
+      `Something on the Keshet side isn't responding right now. This is not something the builder did. It is safe to send again in a few minutes. ${d}`);
   }
   if (code === 'REQUESTER_REQUIRED') {
     fail(EXIT_SIGNIN,
-      "The sign-in Keshet received wasn't a personal one, so it can't record who owns the app. Run the send again and sign in when the code appears.");
+      `The sign-in Keshet received wasn't a personal one, so it can't record who owns the app. Run the send again and sign in when the code appears. ${d}`);
   }
   if (code === 'NAME_INVALID') {
     fail(EXIT_REFUSED,
-      `Keshet did not accept the app's name${msg ? `: ${msg}` : ''}. Pick a new name with the builder and send again - nothing was created.`);
+      `Keshet did not accept the app's name${msg ? `: ${msg}` : ''}. Pick a new name with the builder and send again - nothing was created. ${d}`);
   }
   if (code === 'NAME_TAKEN' || code === 'DOMAIN_ALREADY_EXISTS') {
     fail(EXIT_REFUSED,
-      "There's already an app called that at Keshet. Pick a different name with the builder and send again - nothing was created, so there is nothing to undo.");
+      `There's already an app called that at Keshet. Pick a different name with the builder and send again - nothing was created, so there is nothing to undo. ${d}`);
   }
   if (code === 'VAULT_NAME_SOFT_DELETED') {
     fail(EXIT_REFUSED,
-      "An app with this name existed before and was removed, and Keshet keeps its stored settings for a short while, so the name isn't free yet. Pick a different name, or ask the platform team to release this one.");
+      `An app with this name existed before and was removed, and Keshet keeps its stored settings for a short while, so the name isn't free yet. Pick a different name, or ask the platform team to release this one. ${d}`);
   }
   fail(EXIT_REFUSED,
-    `Keshet did not accept the request${msg ? `: ${msg}` : ''}. If that doesn't say what to change, it is one for the platform team - the builder did nothing wrong.`);
+    `Keshet did not accept the request${msg ? `: ${msg}` : ''}. If that doesn't say what to change, it is one for the platform team - the builder did nothing wrong. ${d}`);
 };
 
 // The IT review case the run raised, when the answer carries one. Printed at
@@ -444,11 +483,17 @@ const accepted = () => {
 // The send itself, from reachability to Keshet's final answer
 // --------------------------------------------------------------------------
 const main = async () => {
-  say("Checking that Keshet's deployment service is reachable...");
-  const health = await http('GET', '/api/monitor/check', undefined, 10);
-  if (!health.ok) {
+  say(`Checking that Keshet's deployment service is reachable at ${BASE_URL}...`);
+  const health = await http('GET', HEALTH_PATH, undefined, 10);
+  if (!health.reached) {
     fail(EXIT_UNREACHABLE,
-      "Keshet's deployment service can't be reached from this network. Connecting to the Keshet network (VPN or office) and sending again usually fixes this. Nothing was sent and nothing is lost.");
+      `Keshet's deployment service can't be reached at ${BASE_URL} from this network${health.timedOut ? ' - it did not answer in time' : ''}. Connecting to the Keshet network (VPN or office) and sending again usually fixes this. Nothing was sent and nothing is lost. ${detail(HEALTH_PATH, 0)}`);
+  }
+  // A service that answers anything is reachable, so this is not fatal - but
+  // an unhealthy answer belongs in the transcript, because the sign-in that
+  // follows is the call that will explain itself properly.
+  if (!health.ok) {
+    say(`The service answered, but not with a healthy reply. ${detail(HEALTH_PATH, health.status)}`);
   }
 
   // ------------------------------------------------------------------------
@@ -457,15 +502,31 @@ const main = async () => {
   // JSON body even though the endpoint takes no input.
   // ------------------------------------------------------------------------
   say('Keshet needs the builder to sign in before the app can be sent.');
-  const start = await http('POST', '/api/apps/auth/device-code', '{}', 30);
+  const start = await http('POST', DEVICE_CODE_PATH, '{}', 30);
+  if (!start.reached) {
+    fail(EXIT_UNREACHABLE,
+      `The connection to Keshet ${start.timedOut ? 'timed out' : 'dropped'} while starting the sign-in. It is safe to run the send again. ${detail(DEVICE_CODE_PATH, 0)}`);
+  }
+  if (start.status >= 400 && start.status < 500) {
+    // 404/405/410 is the wrong-instance signature: something is listening and
+    // it is not this API, or it is a build from before device sign-in existed.
+    const noEndpoint = [404, 405, 410].includes(start.status);
+    fail(EXIT_SIGNIN, noEndpoint
+      ? `Keshet answered, but there is no sign-in at the address the send is using, so the sign-in never started. Either the send is pointed at the wrong service or that service is too old to have it. Nothing was sent. ${detail(DEVICE_CODE_PATH, start.status)}`
+      : `Keshet turned down the request to start the sign-in, so no code was issued. This is not something the builder did - it needs the platform team. Nothing was sent. ${detail(DEVICE_CODE_PATH, start.status, jstr(start.json, 'code'))}`);
+  }
   if (!start.ok) {
     fail(EXIT_UNREACHABLE,
-      'The connection to Keshet dropped while starting the sign-in. It is safe to run the send again.');
+      `Keshet's deployment service answered but could not start the sign-in - the trouble is on the service's side, not the network's and not the builder's. It is safe to run the send again in a few minutes. ${detail(DEVICE_CODE_PATH, start.status)}`);
+  }
+  if (start.json === null) {
+    fail(EXIT_UNREACHABLE,
+      `Keshet's deployment service accepted the sign-in request and then answered with ${start.empty ? 'nothing at all' : 'something that was not its usual answer'}, which is what a service restarting mid-request looks like. It is safe to run the send again in a few minutes. ${detail(DEVICE_CODE_PATH, start.status)}`);
   }
   const deviceCode = jstr(start.json, 'deviceCode');
   if (deviceCode === '') {
     fail(EXIT_SIGNIN,
-      'The sign-in could not start on the Keshet side. This is not something the builder did - it needs the platform team. It is safe to try again later.');
+      `Keshet answered the sign-in request, but its answer carried no sign-in code, so there is nothing for the builder to enter. This is not something the builder did - it needs the platform team. ${detail(DEVICE_CODE_PATH, start.status)}`);
   }
   const userCode = jstr(start.json, 'userCode');
   const verificationUri = jstr(start.json, 'verificationUri');
@@ -494,11 +555,13 @@ const main = async () => {
       say(`Still waiting for the sign-in - about ${minutesLeft} minute(s) left on this code.`);
       lastHeartbeat = now;
     }
-    const poll = await http('POST', '/api/apps/auth/device-token', JSON.stringify({ deviceCode }), 30);
-    if (!poll.ok) {
+    const poll = await http('POST', DEVICE_TOKEN_PATH, JSON.stringify({ deviceCode }), 30);
+    // The service reports both waiting and refusal in the body, so a non-2xx
+    // that still carries a body is an answer to read, not a failure to retry.
+    if (!poll.reached || (!poll.ok && poll.json === null)) {
       pollErrors += 1;
       if (pollErrors === 6) {
-        say('Having trouble reaching Keshet while waiting for the sign-in - still trying. If this keeps up, the network is the problem, not the sign-in.');
+        say(`Having trouble getting an answer from Keshet while waiting for the sign-in - still trying. If this keeps up, the problem is the connection or the service, not the sign-in. ${detail(DEVICE_TOKEN_PATH, poll.status)}`);
       }
       continue;
     }
@@ -512,7 +575,11 @@ const main = async () => {
     if (status === 'pending') continue;
     if (jstr(poll.json, 'code') !== '') {
       fail(EXIT_SIGNIN,
-        'The sign-in did not complete. Nothing is lost - run the send again for a fresh code.');
+        `The sign-in did not complete. Nothing is lost - run the send again for a fresh code. ${detail(DEVICE_TOKEN_PATH, poll.status, jstr(poll.json, 'code'))}`);
+    }
+    if (!poll.ok) {
+      fail(EXIT_SIGNIN,
+        `Keshet turned down the check on the sign-in, so it cannot finish. Nothing is lost - run the send again for a fresh code. ${detail(DEVICE_TOKEN_PATH, poll.status)}`);
     }
   }
   if (token === '') {
@@ -525,12 +592,16 @@ const main = async () => {
   // Send, then follow the run until Keshet has an answer
   // ------------------------------------------------------------------------
   say('Sending the app to Keshet now. This can take a few minutes...');
-  const sent = await http('POST', '/api/apps', JSON.stringify(payload), 900, token);
-  if (!sent.ok) {
+  const sent = await http('POST', SEND_PATH, JSON.stringify(payload), 900, token);
+  if (!sent.reached) {
     fail(EXIT_UNREACHABLE,
-      'The connection to Keshet dropped while sending. It is safe to run the send again - the identical app sent twice is recognised as the same request.');
+      `The connection to Keshet ${sent.timedOut ? 'timed out' : 'dropped'} while sending. It is safe to run the send again - the identical app sent twice is recognised as the same request. ${detail(SEND_PATH, 0)}`);
   }
-  if (sent.status < 200 || sent.status >= 300) refuseHttp(sent.status, sent.json);
+  if (!sent.ok) refuseHttp(sent.status, sent.json, SEND_PATH);
+  if (sent.json === null) {
+    fail(EXIT_UNREACHABLE,
+      `Keshet took the app and then answered with ${sent.empty ? 'nothing at all' : 'something that could not be read'}, so there is no way to tell here what became of it. It is safe to run the send again in a few minutes - the identical app sent twice is recognised as the same request. ${detail(SEND_PATH, sent.status)}`);
+  }
 
   let runStatus = jstr(sent.json, 'status');
   const runId = jstr(sent.json, 'runId');
@@ -550,9 +621,10 @@ const main = async () => {
   let lastStep = '';
   for (let i = 0; i < POLL_COUNT; i++) {
     await sleep(POLL_INTERVAL);
-    const r = await http('GET', `/api/apps/${sentApp}/runs/${runId}`, undefined, 60, token);
-    if (!r.ok) continue;
-    if (r.status < 200 || r.status >= 300) refuseHttp(r.status, r.json);
+    const runPath = `${SEND_PATH}/${sentApp}/runs/${runId}`;
+    const r = await http('GET', runPath, undefined, 60, token);
+    if (!r.reached) continue;
+    if (!r.ok) refuseHttp(r.status, r.json, runPath);
     runStatus = jstr(r.json, 'status');
     noteItcc(r.json);
     const started = (Array.isArray(r.json?.steps) ? r.json.steps : [])
