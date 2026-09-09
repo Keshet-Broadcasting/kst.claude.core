@@ -7,7 +7,7 @@ description: >
   "I want to implement", "how do I make", "build a form", "add a store", or any request to
   create new functionality. If the user describes something they want the app to do that it
   does not yet do — read this skill first, before touching any file.
-version: 1.0.0
+version: 0.1.2
 ---
 
 # Feature Workflow

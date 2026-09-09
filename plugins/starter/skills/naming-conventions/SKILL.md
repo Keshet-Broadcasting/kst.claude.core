@@ -6,7 +6,7 @@ description: >
   asks "what should I call this?", "how should I name this?", "is this name right?", or "what's
   the naming convention here?". Read it before creating any new file or slice, not after —
   catching a wrong name before it is written is far cheaper than fixing it across imports.
-version: 1.0.0
+version: 0.1.2
 ---
 
 # Naming conventions

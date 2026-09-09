@@ -1,7 +1,7 @@
 ---
 name: start-with-a-repo
 description: Use at the START of building, before writing or changing any code — a brand-new app in any folder, the first conversation in a fresh copy of the starter, the user saying "let's build", "let's start", "make me an app", or ANY code change when the project has no `.git` folder yet. Fires on every new app, whatever the folder came from. The project must have a local git repo and a first checkpoint from the very first change, so every later step can be undone and deploy-time agents always find history. If git itself is not installed on the machine, this skill installs it first.
-version: 1.0.0
+version: 0.1.2
 ---
 
 # Start with a repo

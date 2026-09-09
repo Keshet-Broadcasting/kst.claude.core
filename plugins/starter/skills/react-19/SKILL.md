@@ -1,7 +1,7 @@
 ---
 name: react-19
 description: Use when writing, reviewing, or debugging any React component or hook in this project — including refs, forms, Server/Client Component boundaries, and Actions. React 19 changed useRef, ref-as-prop, and form hooks; React 18 patterns are wrong here.
-version: 1.0.0
+version: 0.1.2
 ---
 
 # React 19
