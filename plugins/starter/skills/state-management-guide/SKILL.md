@@ -1,6 +1,7 @@
 ---
 name: state-management-guide
 description: Consult this skill whenever there is any question about where state should live — "where do I put this", "useState or Zustand", "should this be in the store", "global state", "shared state", "re-renders from the store", "form state", "URL filters", "pagination", "server data", "optimistic update", or any question about managing state in this app. Also invoke proactively when someone is about to add loading flags, hover state, open/closed toggles, server-fetched data, or form drafts to the global Zustand store — those do not belong there.
+version: 1.0.0
 ---
 
 # State Management Guide
