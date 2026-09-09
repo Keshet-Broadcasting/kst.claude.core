@@ -1,7 +1,7 @@
 ---
 name: zustand-5
 description: Use when creating, modifying, testing, or reviewing any Zustand store, selector, or store provider in this project. Zustand 5 + Next.js App Router requires store-per-request; v4 patterns and module-singleton stores are wrong here.
-version: 1.0.0
+version: 0.1.2
 ---
 
 # Zustand 5

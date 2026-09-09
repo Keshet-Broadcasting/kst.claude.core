@@ -6,7 +6,7 @@ description: >
   about a hyphenated JSX tag or a `<script>` tag outside `@keshet/embeds`. Also trigger when
   someone asks how to integrate an external player, chat widget, map widget, or any library
   that loads via a `<script>` tag. Never hand-write embed folders — always follow this workflow.
-version: 1.0.0
+version: 0.1.2
 ---
 
 # Embeds
