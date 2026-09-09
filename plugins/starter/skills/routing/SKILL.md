@@ -9,6 +9,7 @@ description: >
   route handlers (route.ts); parallel routes. Trigger proactively when the user says "new page",
   "add a page", "add a route", "navigate", "redirect", "search params", "filters in URL",
   or asks about URL structure.
+version: 1.0.0
 ---
 
 # Routing in this project

@@ -8,6 +8,7 @@ description: >
   working", "I see an error", "nothing loads", "it crashed", "why is it red",
   "everything is messed up", "this used to work", "something feels off", or asks
   how to debug anything in this app. Invoke before doing anything else.
+version: 1.0.0
 ---
 
 # Debug Workflow

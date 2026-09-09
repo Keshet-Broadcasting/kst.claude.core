@@ -1,6 +1,7 @@
 ---
 name: env-vars
 description: Load this skill whenever the user mentions environment variables, env vars, API keys, secrets, tokens, `.env` files, `NEXT_PUBLIC_` prefixes, or connecting the app to any external service (database, payment provider, AI API, analytics, auth, CMS). Also trigger when the user is about to hardcode a URL, credential, or token in source code. Trigger immediately when someone says "the API key isn't working", "I can't reach the database", or "the service isn't connecting" — those are almost always env var problems.
+version: 1.0.0
 ---
 
 # Environment variables

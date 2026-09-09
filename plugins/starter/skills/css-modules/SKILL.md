@@ -1,6 +1,7 @@
 ---
 name: css-modules
 description: Use when writing or editing ANY CSS in this project — new component styles, .module.css files, design tokens, theming, dark mode, responsive layout, animations, or when the user asks "how should this look". Also use when deciding whether to use media queries, container queries, or intrinsic layout. This project uses plain CSS Modules with CSS custom-property design tokens; hard-coded values, SCSS patterns, and Tailwind are wrong here.
+version: 1.0.0
 ---
 
 # CSS Modules — house conventions

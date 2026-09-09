@@ -7,6 +7,7 @@ description: >
   failing. Always consult this skill before placing a new file anywhere in src/. If the user
   says "add a button", "create a page", "make a store", "I got a steiger error", or anything
   that involves creating or moving code — read this first.
+version: 1.0.0
 ---
 
 # Feature-Sliced Design in this project

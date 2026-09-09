@@ -1,6 +1,7 @@
 ---
 name: definition-of-done
 description: Load before reporting that ANY piece of work is finished, and always before sending an app to Keshet. Trigger on "is it ready", "are we done", "send it", "publish", or whenever you are about to say something is complete.
+version: 1.0.0
 ---
 
 # Definition of done
