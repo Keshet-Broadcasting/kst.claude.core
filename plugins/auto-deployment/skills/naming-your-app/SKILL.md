@@ -1,7 +1,6 @@
 ---
 name: naming-your-app
-description: Use whenever the app is being named or renamed - at the start of a new app, when the user says "call it X", or when a name has come back refused. Also use before sending an app to Keshet for the first time, because the name is agreed with the builder before anything is sent.
-version: 0.1.6
+description: Use whenever the app is being named or renamed - at the start of a new app, when the user says "call it X", or when a name has come back refused. Also use before sending an app to Keshet for the first time, because the name is agreed with the builder before anything is sent. V:0.1.6
 ---
 
 # Naming the app

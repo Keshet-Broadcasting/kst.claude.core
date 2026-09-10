@@ -5,8 +5,7 @@ description: >
   a store, a hook, a type, a handler, a server action, or a folder. Also use it when the user
   asks "what should I call this?", "how should I name this?", "is this name right?", or "what's
   the naming convention here?". Read it before creating any new file or slice, not after —
-  catching a wrong name before it is written is far cheaper than fixing it across imports.
-version: 0.1.2
+  catching a wrong name before it is written is far cheaper than fixing it across imports. V:0.1.2
 ---
 
 # Naming conventions
