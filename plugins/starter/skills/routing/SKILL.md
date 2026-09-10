@@ -8,8 +8,7 @@ description: >
   Link vs router.push; redirect() and notFound(); URL search params for filters/pagination;
   route handlers (route.ts); parallel routes. Trigger proactively when the user says "new page",
   "add a page", "add a route", "navigate", "redirect", "search params", "filters in URL",
-  or asks about URL structure.
-version: 0.1.2
+  or asks about URL structure. V:0.1.2
 ---
 
 # Routing in this project

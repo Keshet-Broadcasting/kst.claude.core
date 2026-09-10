@@ -1,7 +1,6 @@
 ---
 name: when-a-deploy-fails
-description: Use when anything goes wrong AFTER the app was sent to Keshet - the security checks failed, IT rejected it, the deploy failed, a secret did not resolve, or the app deployed but nobody can open it. Trigger on "it failed", "it was rejected", "why hasn't it deployed", "IT said no", "it's been hours", or any question about the state of a sent app. Not for ordinary bugs while building - use normal debugging for those.
-version: 0.1.6
+description: Use when anything goes wrong AFTER the app was sent to Keshet - the security checks failed, IT rejected it, the deploy failed, a secret did not resolve, or the app deployed but nobody can open it. Trigger on "it failed", "it was rejected", "why hasn't it deployed", "IT said no", "it's been hours", or any question about the state of a sent app. Not for ordinary bugs while building - use normal debugging for those. V:0.1.6
 ---
 
 # When something fails after the app was sent

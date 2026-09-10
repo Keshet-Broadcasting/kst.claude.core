@@ -1,7 +1,6 @@
 ---
 name: implement-kst-auth-widget
-description: Use when adding, embedding, or integrating the Keshet KST auth/permissions widget (`<kst-auth-widget>`, the user/permission manager) into a React app — e.g. "add the permissions widget to our React dashboard", "show who has access to app X in React", "embed kst-auth-widget", "React wrapper for the keshet auth web component", or when the widget is already embedded and the user wants to stop it prompting a second login ("pass our MSAL token to the widget", "getToken"). Covers loading the single hosted bundle, wiring the host's token provider, and a typed React wrapper (React 19+). Do NOT use for building the widget itself (the Angular kst.auth.widget project) or for a custom, from-scratch React permissions/roles UI.
-version: 0.1.6
+description: Use when adding, embedding, or integrating the Keshet KST auth/permissions widget (`<kst-auth-widget>`, the user/permission manager) into a React app — e.g. "add the permissions widget to our React dashboard", "show who has access to app X in React", "embed kst-auth-widget", "React wrapper for the keshet auth web component", or when the widget is already embedded and the user wants to stop it prompting a second login ("pass our MSAL token to the widget", "getToken"). Covers loading the single hosted bundle, wiring the host's token provider, and a typed React wrapper (React 19+). Do NOT use for building the widget itself (the Angular kst.auth.widget project) or for a custom, from-scratch React permissions/roles UI. V:0.1.6
 ---
 
 # Implement `<kst-auth-widget>` in React

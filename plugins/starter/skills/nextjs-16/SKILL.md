@@ -1,7 +1,6 @@
 ---
 name: nextjs-16
-description: Use when writing, reviewing, or debugging any Next.js code in this project — App Router pages, layouts, route handlers, data fetching, caching, or config. Next.js 16 has breaking changes from Next 14/15; training-data patterns are wrong here. Covers Next.js 16 only.
-version: 0.1.2
+description: Use when writing, reviewing, or debugging any Next.js code in this project — App Router pages, layouts, route handlers, data fetching, caching, or config. Next.js 16 has breaking changes from Next 14/15; training-data patterns are wrong here. Covers Next.js 16 only. V:0.1.2
 ---
 
 # Next.js 16

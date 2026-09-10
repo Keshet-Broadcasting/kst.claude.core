@@ -7,8 +7,7 @@ description: >
   right. Also use it when the user says "it's broken", "something broke", "not
   working", "I see an error", "nothing loads", "it crashed", "why is it red",
   "everything is messed up", "this used to work", "something feels off", or asks
-  how to debug anything in this app. Invoke before doing anything else.
-version: 0.1.2
+  how to debug anything in this app. Invoke before doing anything else. V:0.1.2
 ---
 
 # Debug Workflow

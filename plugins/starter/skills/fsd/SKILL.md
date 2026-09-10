@@ -6,8 +6,7 @@ description: >
   violation or import boundary error, or when code is in the wrong folder and the build is
   failing. Always consult this skill before placing a new file anywhere in src/. If the user
   says "add a button", "create a page", "make a store", "I got a steiger error", or anything
-  that involves creating or moving code — read this first.
-version: 0.1.2
+  that involves creating or moving code — read this first. V:0.1.2
 ---
 
 # Feature-Sliced Design in this project
