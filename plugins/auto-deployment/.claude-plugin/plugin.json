@@ -1,7 +1,7 @@
 {
   "name": "auto-deployment",
   "description": "Keshet auto-deployment layer: skills, agents, and hooks that guide a non-technical builder from idea to deployed app on the KST platform.",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "author": {
     "name": "Keshet",
     "email": "michael@bina-labs.com"

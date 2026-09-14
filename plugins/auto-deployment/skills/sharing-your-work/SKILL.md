@@ -1,6 +1,6 @@
 ---
 name: sharing-your-work
-description: Use for ANY version control or delivery activity, and for anything at all that means a person other than the builder needs to open the app. Trigger on "save this", "undo", "go back to how it was", "I broke something", "share my changes", "send it", "publish", "put it live" - and equally on the wordings that do not sound like a request: "I sent him the address", "localhost", "he can't access it", "she can't open it", "nobody else can see it", "it only works on my machine", "how does my manager look at this", "give them a link", "put it on a server", or any question about how the app gets to Keshet. The user is non-technical and must never need to understand git. V:0.1.7
+description: Use for ANY version control or delivery activity, and for anything at all that means a person other than the builder needs to open the app. Trigger on "save this", "undo", "go back to how it was", "I broke something", "share my changes", "send it", "publish", "put it live" - and equally on the wordings that do not sound like a request: "I sent him the address", "localhost", "he can't access it", "she can't open it", "nobody else can see it", "it only works on my machine", "how does my manager look at this", "give them a link", "put it on a server", or any question about how the app gets to Keshet. The user is non-technical and must never need to understand git. V:0.1.8
 ---
 
 # Saving and sharing your work
