@@ -6,9 +6,11 @@
 follows FR-DP-13's precedent, so upstream drift can be diffed rather than
 guessed at.
 
-This is the only file in either donor repo carried over unchanged. It is
-accurate, Keshet-specific, and knows things about the tenant's identity plumbing
-that nothing else we hold knows.
+It was carried over unchanged at first. Since 0.1.7 it diverges from upstream in
+one deliberate way: upstream tells the developer to obtain `azure-app-id` from
+the user, while on this platform the id is created by the deploy pipeline and
+injected as `KST_AZURE_APP_ID`, so the skill now forbids asking the builder and
+adds a plain-HTML embed path. Diff against upstream with that in mind.
 
 ## The one thing that must be stated, and is not in the skill
 
