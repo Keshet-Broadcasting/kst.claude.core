@@ -1,9 +1,9 @@
 ---
 name: implement-kst-auth-widget
-description: Use when adding, embedding, or integrating the Keshet KST auth/permissions widget (`<kst-auth-widget>`, the user/permission manager) into a React app — e.g. "add the permissions widget to our React dashboard", "show who has access to app X in React", "embed kst-auth-widget", "React wrapper for the keshet auth web component", or when the widget is already embedded and the user wants to stop it prompting a second login ("pass our MSAL token to the widget", "getToken"). Covers loading the single hosted bundle, wiring the host's token provider, and a typed React wrapper (React 19+). Do NOT use for building the widget itself (the Angular kst.auth.widget project) or for a custom, from-scratch React permissions/roles UI. V:0.1.6
+description: Use when adding, embedding, or integrating the Keshet KST auth/permissions widget (`<kst-auth-widget>`, the user/permission manager) into an app - React (typed wrapper, React 19+) or plain HTML served by any backend - e.g. "add the permissions widget", "show who has access to app X", "embed kst-auth-widget", or when the widget is already embedded and the user wants to stop it prompting a second login ("pass our MSAL token to the widget", "getToken"). Covers loading the single hosted bundle, reading the app id from the platform (never asking the builder for it), and wiring the host's token provider. Do NOT use for building the widget itself (the Angular kst.auth.widget project) or for a custom, from-scratch permissions/roles UI. V:0.1.7
 ---
 
-# Implement `<kst-auth-widget>` in React
+# Implement `<kst-auth-widget>` in an app
 
 ## Overview
 
@@ -27,6 +27,26 @@ nothing to switch between. If the user says "we're on dev" or "point it at stage
 actually happens: the API derives the environment from `azure-app-id` (Keshet app registrations
 are per environment, so the dev app id resolves to the dev database). Using the dev app id *is*
 using dev.
+
+## Where `azure-app-id` comes from - never the builder
+
+**Do not ask the builder for the app id. Ever.** They do not have it and cannot get it: the id is
+the app's own Entra app registration, which the deploy pipeline *creates* on the first deploy and
+then injects into the running app as the environment variable **`KST_AZURE_APP_ID`**. Before the
+first deploy it does not exist; after it, the app reads it. A builder is non-technical and has no
+"IT team who set up the app in Azure AD" to go to - the platform is that team.
+
+So the rule is:
+
+- The app reads `KST_AZURE_APP_ID` from its environment at runtime and passes it to the widget.
+- Never a hard-coded GUID, never a placeholder GUID, never a prompt to the builder. The verifier
+  greps for `KST_AZURE_APP_ID` and refuses to sign off an app that hard-codes the id or does not
+  read it - a placeholder would silently render nothing *and* block the deploy.
+- Locally the variable is usually absent. Render a short "access panel is not configured
+  (KST_AZURE_APP_ID is not set)" message instead of the widget; do not invent a value.
+
+If the builder asks "what is the app id?", the answer is: "Nothing to provide - the platform
+assigns it when the app is deployed, and the app picks it up automatically."
 
 ## Supported inputs (React 19+)
 
@@ -81,7 +101,9 @@ import { KstAuthWidget } from './kst-auth-widget/KstAuthWidget';
 
 const AUTH_API_SCOPE = 'api://39f9ffc3-ca80-4a61-bb84-ee283b46fcf3/.default'; // stage auth API
 
-export function PermissionsPage() {
+// Set by the deploy pipeline on the running app. Read it server-side (Next.js: in the
+// server component and pass it down as a prop); never hard-code it.
+export function PermissionsPage({ azureAppId }: { azureAppId: string | undefined }) {
   const { instance, accounts } = useMsal();
 
   // Called on every widget request, so silent renewal is handled by MSAL and the
@@ -95,14 +117,15 @@ export function PermissionsPage() {
     return result.accessToken;
   }, [instance, accounts]);
 
-  return (
-    <KstAuthWidget
-      azureAppId="00000000-0000-0000-0000-000000000000"
-      getToken={getToken}
-      theme="light"
-    />
-  );
+  if (!azureAppId) {
+    return <p>The access panel is not configured: KST_AZURE_APP_ID is not set.</p>;
+  }
+
+  return <KstAuthWidget azureAppId={azureAppId} getToken={getToken} theme="light" />;
 }
+
+// e.g. app/(protected)/access/page.tsx (server component):
+//   <PermissionsPage azureAppId={process.env.KST_AZURE_APP_ID} />
 ```
 
 Two properties of the contract that shape the code:
@@ -122,22 +145,22 @@ single audience. Flag this to the user; it usually needs someone with tenant adm
 
 ## Prerequisites — check first
 
-1. **Get the `azure-app-id` from the user, ideally before starting.** The widget will not
-   render without it, and it is specific to the application being managed (its Azure AD app /
-   client id, a GUID). It also determines which environment's data you see. Ask up front rather
-   than guessing — a placeholder like `00000000-0000-0000-0000-000000000000` will silently render
-   nothing. If they don't have it yet, you can still scaffold the wrapper, but flag clearly that
-   the real GUID must be filled in before the widget will work.
+1. **Confirm the app reads `KST_AZURE_APP_ID` from its environment** and passes it to the widget
+   (see "Where `azure-app-id` comes from"). Do not ask the builder for an id and do not scaffold
+   with a placeholder GUID - both fail the verifier. If the app has no server-side way to read an
+   environment variable yet (a static page), add one (see the plain HTML section).
 2. **Find out whether the host app already authenticates with Azure AD / MSAL.** Grep for
    `@azure/msal` in `package.json`. If it's there, wire `getToken` — don't leave the user with a
    double login. If it isn't, skip `getToken` and mention the widget will show its own popup.
-3. **React 19 or newer.** Check `package.json`. React 19 sets unknown props on custom elements as
-   attributes (and functions/objects as properties) automatically; **React ≤18 does neither** and
-   needs a ref-based wrapper instead. If the target app is <19, STOP and tell the user — this
-   skill's wrapper assumes 19+.
-4. **TypeScript** (this skill assumes TS; for plain JS, skip the `.d.ts` step).
+3. **Is it React at all?** If the app is plain HTML (any backend - Python, Node, static files
+   behind a small server), skip the React wrapper entirely and follow "Plain HTML apps" below.
+4. **React 19 or newer** (React apps only). Check `package.json`. React 19 sets unknown props on
+   custom elements as attributes (and functions/objects as properties) automatically; **React ≤18
+   does neither** and needs a ref-based wrapper instead. If the target app is <19, STOP and tell
+   the user - this skill's wrapper assumes 19+.
+5. **TypeScript** (the React wrapper assumes TS; for plain JS, skip the `.d.ts` step).
 
-## Steps
+## Steps - React app
 
 1. Copy the three reference files into the app (e.g. `src/kst-auth-widget/`):
    - [`KstAuthWidget.tsx`](references/KstAuthWidget.tsx) — the typed React wrapper.
@@ -150,8 +173,47 @@ single audience. Flag this to the user; it usually needs someone with tenant adm
 4. Render it:
 
    ```tsx
-   <KstAuthWidget azureAppId={AZURE_APP_ID} getToken={getToken} theme="light" />
+   <KstAuthWidget azureAppId={azureAppId} getToken={getToken} theme="light" />
    ```
+
+   where `azureAppId` was read from `process.env.KST_AZURE_APP_ID` on the server.
+
+## Steps - plain HTML app
+
+The widget is a custom element, so any page that can run a `<script>` tag can host it. The only
+work is getting `KST_AZURE_APP_ID` from the server's environment into the page - it must not be
+typed into the HTML.
+
+1. **Have the server inject the id.** Whatever serves the page reads the variable and writes it
+   into the HTML at request time. Two common shapes:
+   - Template rendering (Flask/Jinja, FastAPI templates, Express views):
+     `<kst-auth-widget azure-app-id="{{ azure_app_id }}" theme="light"></kst-auth-widget>`
+     with `azure_app_id = os.environ.get("KST_AZURE_APP_ID")` passed to the template.
+   - A tiny config endpoint, when the HTML is a static file: the server exposes
+     `GET /config` returning `{"azureAppId": "<env value>"}` and the page fetches it before
+     creating the element.
+2. **Load the bundle once**, on the page behind sign-in:
+
+   ```html
+   <script src="https://app-stage.keshet-tv.com/widgets/kst.auth.widget.js" defer></script>
+   ```
+
+3. **Render the element only when the id is present.** If the injected value is empty, show
+   "The access panel is not configured: KST_AZURE_APP_ID is not set." instead.
+4. **Token:** if the page already signs users in with MSAL (`@azure/msal-browser`), set the
+   provider as a *property* after the element exists, never as an attribute:
+
+   ```js
+   const el = document.querySelector('kst-auth-widget');
+   el.getToken = async () => {
+     const account = msal.getActiveAccount() ?? msal.getAllAccounts()[0];
+     const r = await msal.acquireTokenSilent({ account, scopes: [AUTH_API_SCOPE] });
+     return r.accessToken;
+   };
+   ```
+
+   If the page has no MSAL session of its own, leave `getToken` unset; the widget uses its own
+   login popup (see the fallback caveats in Gotchas).
 
 ## Gotchas
 
@@ -179,6 +241,7 @@ single audience. Flag this to the user; it usually needs someone with tenant adm
 
 | Mistake | Fix |
 |---------|-----|
+| Asking the builder for the app id, or scaffolding with a placeholder GUID | The builder does not have it and cannot get it. Read `KST_AZURE_APP_ID` from the environment; the pipeline sets it on first deploy. |
 | Adding an `env` prop or dev/stage/prod URL map | There is one bundle at `https://app-stage.keshet-tv.com/widgets/kst.auth.widget.js`. The environment follows from `azure-app-id`. |
 | Skipping `getToken` in an app that already uses MSAL | The user gets a second login popup for an identity they've already provided. Wire the provider. |
 | Passing `getToken` as an attribute, or dash-cased | It's a property, camelCase: `getToken={fn}`. |
