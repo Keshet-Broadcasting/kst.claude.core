@@ -7,7 +7,7 @@ tools: Read, Grep, Glob, Edit
 # Auth agent
 
 <!--
-Requirement FR-BL-11. Position 3 in the chain defined by the orchestrator agent:
+Requirement FR-BL-11. Position 3 in the chain defined by the deploying-your-app skill (the orchestrator):
 after secrets-manager - deliberately, because auth wiring often needs a secret,
 and by now every secret is declared by name and reachable as an ordinary
 environment variable of that name (FR-SK-04, FR-SK-12), so nothing here ever

@@ -1,6 +1,6 @@
 ---
 name: sharing-your-work
-description: Use for ANY version control or delivery activity, and for anything at all that means a person other than the builder needs to open the app. Trigger on "save this", "undo", "go back to how it was", "I broke something", "share my changes", "send it", "publish", "put it live" - and equally on the wordings that do not sound like a request: "I sent him the address", "localhost", "he can't access it", "she can't open it", "nobody else can see it", "it only works on my machine", "how does my manager look at this", "give them a link", "put it on a server", or any question about how the app gets to Keshet. The user is non-technical and must never need to understand git. V:0.1.10
+description: Use for ANY version control or delivery activity, and for anything at all that means a person other than the builder needs to open the app. Trigger on "save this", "undo", "go back to how it was", "I broke something", "share my changes", "send it", "publish", "put it live" - and equally on the wordings that do not sound like a request: "I sent him the address", "localhost", "he can't access it", "she can't open it", "nobody else can see it", "it only works on my machine", "how does my manager look at this", "give them a link", "put it on a server", or any question about how the app gets to Keshet. The user is non-technical and must never need to understand git. V:0.1.11
 ---
 
 # Saving and sharing your work
@@ -172,15 +172,17 @@ It happens when they ask for it and when every check has passed.
 
 ### What happens when they say "send it" / "publish" / "put it live"
 
-1. **Hand it to the orchestrator.** Dispatch the `orchestrator` agent and say
-   the builder wants to deploy. It decides which agents run and in what order,
-   collects what each concluded, and the verifier signs off last. Nothing is
-   sent until the verifier approves - see the `definition-of-done` skill.
+1. **Become the orchestrator.** Load the `deploying-your-app` skill and
+   follow it: it makes you the orchestrator, launching the deployment agents
+   as sub-agents in a fixed order, collecting what each concluded, with the
+   verifier signing off last. Nothing is sent until the verifier approves -
+   see the `definition-of-done` skill.
 
-   **Do not run the agents yourself and do not name them to the builder.** This
-   skill recognises the request; the orchestrator owns the chain. Keeping the
-   order in one place is the point - a second copy of it here would drift, and a
-   chain assembled from memory is how a check gets skipped.
+   **Do not run the checks from memory and do not name the agents to the
+   builder.** This skill recognises the request; `deploying-your-app` owns
+   the chain. Keeping the order in one place is the point - a second copy of
+   it here would drift, and a chain assembled from memory is how a check gets
+   skipped.
 2. **Send.** One send, whatever the app's history. Keshet takes it from there:
    it sets up whatever the app still needs, and it records the builder as the
    author of the work. Their name stays on it.

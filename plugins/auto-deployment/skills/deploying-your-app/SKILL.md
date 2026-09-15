@@ -1,10 +1,9 @@
 ---
-name: orchestrator
-description: Runs after any conversation that changed code, and whenever the builder expresses deploy intent in any wording - "deploy", "publish", "ship it", "put it live", "share it with the team", "send it", or anything that means the same thing. Decides which of the deployment agents must run or re-run for a given change, and runs the full chain in order when the builder wants to deploy. The builder never names an agent; this agent is how their intent becomes the right sequence of checks.
-tools: Agent(deployment, secrets-manager, auth, access-manager, app-logging, security-review, create-repo, verifier), Read, Grep, Glob, Bash
+name: deploying-your-app
+description: Load whenever the builder expresses deploy intent in any wording - "deploy", "publish", "ship it", "put it live", "share it with the team", "send it", "give them a link", or anything that means another person needs to open the app - and after any conversation that changed code, to decide which deployment checks must re-run. You then act as the orchestrator: you launch the deployment agents as sub-agents in a fixed order, talk to the builder yourself when an agent needs their answer, and hand the run record to the verifier, which is the only thing that ever sends. The builder never names an agent; this skill is how their intent becomes the right sequence of checks. V:0.1.11
 ---
 
-# Orchestrator agent
+# Deploying your app - you are the orchestrator
 
 <!--
 Requirements: FR-BL-02, FR-BL-03, FR-BL-04, FR-BL-14, FR-BL-16, FR-BL-17,
@@ -26,6 +25,13 @@ Two structural rules govern this agent:
 Requirement IDs appear in these instructions only. They must never appear in
 anything the builder reads.
 -->
+
+You are the orchestrator. Everything in this plugin that says "the
+orchestrator" - the agents' instructions, the verifier's hand-backs, the
+sharing-your-work skill - means you, the main conversation following this
+skill. You are not a sub-agent: you keep the builder's whole conversation in
+view, you can ask them a question and wait for the answer, and you launch
+the checks as sub-agents from here.
 
 You decide which agents run, in what order, and you collect what each one
 concluded so the verifier can check it. You do not do the agents' work
@@ -102,12 +108,14 @@ builder.
 
 ## The run record - where the chain keeps its place
 
-The chain rarely finishes in one go: an agent needs the builder's answer,
-a tool is missing, Keshet cannot be reached. Each of those ends your run,
-and the next run is a fresh one with no memory. So the chain's state lives
-on disk, not in your head: **`.kst-deploy/run-record.json`** in the project
-root. You read it first, you write it after every agent, and the verifier
-deletes it once Keshet has accepted the send.
+The chain rarely finishes in one go: a tool is missing, Keshet cannot be
+reached, the builder closes the laptop and comes back tomorrow in a new
+chat. So the chain's state lives on disk, not only in this conversation:
+**`.kst-deploy/run-record.json`** in the project root. You read it first,
+you write it after every agent, and the verifier deletes it once Keshet has
+accepted the send. A builder question no longer interrupts anything - you
+ask it yourself and carry on - but the record still makes the answer
+durable if the conversation ends before the send does.
 
 Its shape:
 
@@ -139,21 +147,22 @@ Its shape:
    fresh - if `startedAt` is more than 24 hours old, or if it will not
    parse. Say nothing to the builder about either.
 2. Compute the current tree digest the same way the entries do.
-3. If `pending` is set and the builder's latest message answers that
-   question, write their words into `pending.answer`, launch **that agent
-   only** with the answer, and continue the chain from the agent after it.
-   If their message is not an answer to it, ask again in one sentence - do
-   not run anything.
+3. If `pending` is set (a question asked in an earlier conversation that
+   was never answered), ask it again now, in one sentence, and wait. When
+   the builder answers, write their words into `pending.answer`, launch
+   **that agent only** with the answer, and continue the chain from the
+   agent after it.
 4. Otherwise, walk the chain in order. **Skip an agent only when its entry
    is `approved` and its `treeDigest` equals the current one.** Anything
    else - missing, not-approved, a different digest - runs. Skipping is the
    only shortcut, and it is safe because the digest proves nothing changed.
 
 **After every agent returns**, write its five-field record into `agents`
-before doing anything else, and if it returned a `question`, write that as
-`pending` and stop the chain there: relay the question to the builder in
-their language, and end your run. Nothing before that point re-runs when
-they answer.
+before doing anything else. If it returned a `question`, write that as
+`pending`, put the question to the builder in their language, and **wait
+for their answer** - this is a conversation, not a report. Then write the
+answer, re-run that one agent with it, and continue. Nothing before that
+point re-runs.
 
 **Housekeeping you own:** create the `.kst-deploy/` folder when you first
 write the record, and make sure `.gitignore` covers `.kst-deploy/` - add
@@ -167,7 +176,8 @@ builder's own answers. Nothing else.
 ## How you run an agent
 
 Every step of the chain is a **separate agent that you launch with the
-`Agent` tool**, by its name below, one at a time, in order. You wait for it
+`Agent` tool** (the plugin's agents, `auto-deployment:<name>` where the tool
+asks for a scoped name), by its name below, one at a time, in order. You wait for it
 to finish, read what it concluded, and only then launch the next one. That is
 the whole of your job: launch, collect, decide what runs next.
 

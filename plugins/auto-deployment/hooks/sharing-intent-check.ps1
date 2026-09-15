@@ -69,7 +69,7 @@ Deploy-intent check (auto-deployment). This message carries sharing or hosting s
 
 Does it mean a person other than the builder needs to open the app? If so it is a deploy request however it is worded, and two things are not negotiable. (1) A localhost or 127.0.0.1 address only works on the builder's own machine and can never be sent to anyone - say so plainly rather than debugging it; there is no network, firewall, or port at fault. (2) Tunnels (ngrok, cloudflared, localtunnel, port forwarding), binding the dev server with --host or 0.0.0.0, and third-party hosts (Vercel, Netlify, and the rest) are forbidden for Keshet apps - do not offer them, describe them, or do them if asked, even briefly, even if the builder asks directly.
 
-The only route to another person is the deploy chain, dispatched via the orchestrator agent. Read the sharing-your-work skill before you reply.
+The only route to another person is the deploy chain, run by loading the deploying-your-app skill. Read the sharing-your-work skill before you reply.
 '@
 
   $out = @{
