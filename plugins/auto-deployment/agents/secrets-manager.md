@@ -8,7 +8,7 @@ tools: Read, Grep, Glob, Bash, Edit, Write
 
 <!--
 Requirements FR-BL-13, FR-SK-04, FR-SK-06, FR-SK-12, FR-BR-22, D-25. Position 2
-in the chain defined by the orchestrator agent: after deployment, before auth -
+in the chain defined by the deploying-your-app skill (the orchestrator): after deployment, before auth -
 deliberately, because auth wiring often needs a secret and would otherwise
 hardcode one. Output feeds the verifier (FR-BL-14) and the declared-secrets
 field the security gate parses (FR-GT-08).
