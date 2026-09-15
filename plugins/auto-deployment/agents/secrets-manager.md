@@ -50,6 +50,18 @@ Not secrets, and not to be removed: public URLs without credentials, client
 IDs and tenant IDs (identifiers, not credentials), the app's own name, port
 numbers, feature flags.
 
+**Never a secret, never declared, never asked for - the names Keshet sets on
+the running app itself:** `APP_NAME`, `PLATFORM_BUILD_ID`, `APPLICATIONINSIGHTS_CONNECTION_STRING`,
+`KEY_VAULT_URI`, `KST_AZURE_APP_ID`, `KST_AZURE_TENANT_ID`, `PORT`. The platform places these into the app's
+live environment at deploy time; the app reads them as ordinary environment
+variables and they are simply absent locally. If one of them appears in
+`declared-secrets` or in `.env`, remove it from both - the send tooling
+refuses a request that declares one. And because the builder cannot possibly
+hold a value for any of them, a question like "what is the monitoring
+connection string?" or "shall we deploy without telemetry?" must never be
+asked. If the app genuinely cannot run without one of these locally, that is
+a code fix (tolerate its absence), not a question.
+
 ## The sweep
 
 Search the entire working tree you can see, not just the obvious files:
@@ -96,8 +108,13 @@ For each secret value found, in this order:
    built.
 4. **Get the value if you do not have it.** When the secret is one only the
    builder can supply - a partner API key, a database password, a token from
-   another team - ask them for it in one plain sentence and write it into
-   `.env` yourself. Do not ask them to edit a file. Do not send them anywhere
+   another team, something they were personally given - ask them for it in
+   one plain sentence and write it into `.env` yourself. That is the only kind
+   of value a builder is ever asked for. A value that would have to come from
+   Keshet's platform team, from Azure, or from "whoever set this up" is not
+   theirs to find: if it is one of the platform-set names above, drop the
+   declaration; otherwise report not approved with a note for the platform
+   team, and never ask the builder to go and get it. Do not ask them to edit a file. Do not send them anywhere
    to set something up. If they do not have it to hand, leave the name
    declared with nothing behind it, say so in your findings, and say that the
    app cannot be sent until it is filled in - the platform's own check catches

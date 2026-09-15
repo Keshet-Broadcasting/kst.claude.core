@@ -130,7 +130,11 @@ So verify precisely what can be verified on this machine:
    `APPLICATIONINSIGHTS_CONNECTION_STRING` when it is present, and every line
    from the shared logging helper flows through that library - not only to the
    console. If the starter already wires this, confirm it survived; if it is
-   missing or was removed, restore it.
+   missing or was removed, restore it. **That variable is never a declared
+   secret, never goes in `.env`, and its value is never asked for** - Keshet
+   sets it on the running app, and nobody on the builder's side has it. Do
+   not offer "get the connection string" or "deploy without telemetry" as
+   choices; neither is a thing the builder can decide.
 2. **The app still runs cleanly without it.** That variable does not exist
    locally. Start the app the ordinary way and confirm it comes up, answers
    its health check, and logs to the console without crashing or complaining.
