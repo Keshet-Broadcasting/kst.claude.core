@@ -16,6 +16,7 @@ const SCRIPT = join(__dirname, 'send-deploy.mjs');
 const TEMPLATE = join(__dirname, '..', 'templates', 'DEPLOY_REQUEST.md');
 
 const EXIT_LOCAL = 1;
+const EXIT_REFUSED = 2;
 const EXIT_UNREACHABLE = 3;
 const EXIT_SIGNIN = 4;
 
@@ -296,4 +297,112 @@ describe('send-deploy.mjs sign-in diagnostics', () => {
     expect(run.stdout).toContain('HTTP 200 from /api/apps/auth/device-code');
     expect(run.stdout).toContain(run.baseUrl);
   });
+});
+
+// --- Findings from the md-render deploy report (Sep 2026) -------------------
+// #9: the VPN was discovered missing only at send time. `--check` lets the
+// chain probe reachability before any agent runs.
+// #8: every attempt was a fresh device sign-in. The tooling now keeps the
+// sign-in between attempts, the way the device-login script does.
+// #7: a 413 under the published limit read as the builder's problem.
+describe('send-deploy.mjs check mode, sign-in cache, and 413', () => {
+  const dirs: string[] = [];
+  const servers: Server[] = [];
+
+  afterEach(async () => {
+    for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+    for (const server of servers.splice(0)) {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+
+  type Counts = { deviceCode: number; refresh: number; send: number };
+  const startRichApi = async (sendStatus: number): Promise<{ baseUrl: string; counts: Counts }> => {
+    const counts: Counts = { deviceCode: 0, refresh: 0, send: 0 };
+    const server = createServer((req: IncomingMessage, res: ServerResponse) => {
+      const reply = (status: number, body: string) => {
+        res.writeHead(status, { 'Content-Type': 'application/json' });
+        res.end(body);
+      };
+      if (req.url === '/api/monitor/check') return reply(200, '{"status":"ok"}');
+      if (req.url === '/api/apps/auth/device-code') {
+        counts.deviceCode += 1;
+        return reply(200, '{"deviceCode":"d1","userCode":"CODE1","verificationUri":"https://example.test/device","interval":1,"expiresIn":60}');
+      }
+      if (req.url === '/api/apps/auth/device-token') {
+        return reply(200, '{"status":"authenticated","accessToken":"at-1","refreshToken":"rt-1","expiresIn":3600,"displayName":"Probe"}');
+      }
+      if (req.url === '/api/apps/auth/refresh') {
+        counts.refresh += 1;
+        return reply(200, '{"accessToken":"at-2","refreshToken":"rt-2","expiresIn":3600}');
+      }
+      if (req.url === '/api/apps') {
+        counts.send += 1;
+        return reply(sendStatus, sendStatus === 413 ? '{"message":"request entity too large"}' : '{"message":"boom"}');
+      }
+      reply(404, '{}');
+    });
+    servers.push(server);
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()));
+    const port = (server.address() as { port: number }).port;
+    return { baseUrl: `http://127.0.0.1:${port}`, counts };
+  };
+
+  const runWith = (dir: string, baseUrl: string, cacheDir: string, extraArgs: string[] = []) =>
+    new Promise<{ status: number | null; stdout: string }>((resolve) => {
+      const child = spawn(process.execPath, [SCRIPT, ...extraArgs, dir], {
+        env: { ...process.env, KST_AUTH_API_BASE_URL: baseUrl, KST_AUTH_TOKEN_CACHE_DIR: cacheDir },
+      });
+      let stdout = '';
+      child.stdout.setEncoding('utf8');
+      child.stdout.on('data', (c: string) => { stdout += c; });
+      child.on('close', (code) => resolve({ status: code, stdout }));
+    });
+
+  it('--check reports a reachable service and exits 0 without touching the request', async () => {
+    const { baseUrl } = await startRichApi(500);
+    const dir = mkdtempSync(join(tmpdir(), 'send-deploy-test-'));
+    dirs.push(dir);
+    const run = await runWith(dir, baseUrl, join(dir, 'cache'), ['--check']);
+    expect(run.status).toBe(0);
+    expect(run.stdout).toContain('reachable');
+  });
+
+  it('--check reports an unreachable service with the VPN hint', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'send-deploy-test-'));
+    dirs.push(dir);
+    const run = await runWith(dir, 'http://127.0.0.1:9', join(dir, 'cache'), ['--check']);
+    expect(run.status).toBe(EXIT_UNREACHABLE);
+    expect(run.stdout).toContain('VPN');
+  });
+
+  it('keeps the sign-in between attempts: the second send asks for no new code', async () => {
+    const { baseUrl, counts } = await startRichApi(500);
+    const dir = mkdtempSync(join(tmpdir(), 'send-deploy-test-'));
+    dirs.push(dir);
+    writeFileSync(join(dir, 'DEPLOY_REQUEST.md'), filledTemplate());
+    writeFileSync(join(dir, 'package.json'), '{}');
+    const cache = join(dir, 'cache');
+    const first = await runWith(dir, baseUrl, cache);
+    expect(first.status).toBe(EXIT_UNREACHABLE);
+    expect(counts.deviceCode).toBe(1);
+    const second = await runWith(dir, baseUrl, cache);
+    expect(second.status).toBe(EXIT_UNREACHABLE);
+    expect(counts.deviceCode).toBe(1);
+    expect(second.stdout).toContain('Still signed in');
+    expect(counts.send).toBe(2);
+  }, 30_000);
+
+  it('names a 413 as a platform-side limit, not the builder\'s app', async () => {
+    const { baseUrl } = await startRichApi(413);
+    const dir = mkdtempSync(join(tmpdir(), 'send-deploy-test-'));
+    dirs.push(dir);
+    writeFileSync(join(dir, 'DEPLOY_REQUEST.md'), filledTemplate());
+    writeFileSync(join(dir, 'package.json'), '{}');
+    const run = await runWith(dir, baseUrl, join(dir, 'cache'));
+    expect(run.status).toBe(EXIT_REFUSED);
+    expect(run.stdout).toContain('under the limit');
+    expect(run.stdout).toContain('platform team');
+    expect(run.stdout).not.toContain('leave out');
+  }, 30_000);
 });

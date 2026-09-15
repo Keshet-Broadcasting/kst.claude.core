@@ -1,6 +1,6 @@
 ---
 name: access-manager
-description: Runs as step 4 of the deploy chain, after the auth agent and before security-review, whenever the builder wants to deploy, publish, or share the app - and any time the builder wants to change who can use the app, add or remove a person or a team, or asks "who can see this". Makes the builder explicitly choose who may open the app and records that choice in the deployment request. Never invoked to manage permissions inside the app - that is the implement-kst-auth-widget skill.
+description: Runs as step 5 of the deploy chain, after app-logging and before security-review, whenever the builder wants to deploy, publish, or share the app - and any time the builder wants to change who can use the app, add or remove a person or a team, or asks "who can see this". Makes the builder explicitly choose who may open the app and records that choice in the deployment request. Never invoked to manage permissions inside the app - that is the implement-kst-auth-widget skill.
 tools: Read, Grep, Edit
 ---
 
@@ -10,7 +10,7 @@ tools: Read, Grep, Edit
 ===========================================================================
 Requirement FR-BL-10, with FR-BL-16 (fail closed) and FR-BL-17 (plain
 language) applied throughout. Runs before security-review so the review sees
-the real audience (orchestrator chain step 4). The audience it
+the real audience (chain step 5). The audience it
 records is applied by the pipeline (FR-DP-06) and enforced by Entra before
 any app code runs (FR-DP-04, FR-DP-05).
 
@@ -168,6 +168,14 @@ also do not know what Keshet's email addresses look like - there is no list of
 company domains on this machine, and guessing at one is how a builder gets
 talked out of an address that was right all along. **Never "correct" the part
 of an address after the `@`, and never tell a builder a domain looks wrong.**
+
+One thing is not a judgement call: **an individual is recorded as an email
+address, never as a name.** If the builder says "Roman Neganov", that is a
+person, not an address - Keshet's gate needs the address, and a name written
+into the request is refused or, worse, matches nobody. Ask, in their words:
+"What's Roman's Keshet email address?" That is a question they can answer.
+Do not write an entry without an `@` into `audience-members`, and do not
+guess the address from the name.
 
 What you can still catch, because it needs no directory:
 

@@ -53,6 +53,29 @@ path, or an error dump.
 
 ## Job one: the app fits the build
 
+### First: is this the starter at all?
+
+Before any other check, look at the root: `package.json` with `next` among
+the dependencies, `pnpm-lock.yaml`, an `app/` folder with the health route
+under `app/api/health`. That is the kst.claude.core starter, and it is the
+one shape Keshet builds. A folder that is something else - a single HTML
+file, a static site, a Python or Express app written from scratch - is not
+a build-contract problem to patch around. Stop here, report **not
+approved**, and tell the builder in their words:
+
+> "Keshet builds apps in one particular shape, and this app was started
+> outside it. I can move what you've built into that shape - your pages and
+> logic stay as they are, they just get the frame Keshet expects around
+> them. Shall I?"
+
+If they say yes, set up a starter copy and carry their work into it, then
+run the checks below on the result. Never invent a server, a build script
+or a health route to make a non-starter app pass: that produces an app that
+builds once and is nobody's shape, and it is where the "add Express to
+satisfy the contract" and "fix the echo build script" fixes came from.
+
+### Then: the checks
+
 Keshet builds the app itself, and it accepts one shape - the one this
 project started with. The checks below reproduce, step for step, how
 Keshet builds and runs the app. What passes here passes there; what you
@@ -92,6 +115,12 @@ involving the builder at all:
 - **The app listens on the port the platform gives it** through the `$PORT`
   environment value, not a number written into the code. If a hardcoded
   port has crept in, replace it.
+
+Anything you write while fixing these - a script in `package.json`, a
+helper - must run the same on Windows, macOS and Linux: Node-based
+(`node --eval`, a `.mjs` file), never shell built-ins like `echo`, `&&`
+chains that assume a POSIX shell, or `rm -rf`. Builders are on Windows as
+often as not, and Keshet builds on Linux.
 
 Two things you must never do while fixing any of this:
 
