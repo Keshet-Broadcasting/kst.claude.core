@@ -9,7 +9,7 @@
 // to sandboxed minimal Linux, and Node is the one tool every builder
 // machine already has (the apps themselves are Next.js apps).
 //
-// The verifier agent runs the launcher as the one and only way an app
+// The verifying-and-sending skill runs the launcher as the one and only way an app
 // reaches Keshet. It signs the builder in through the service's own device
 // sign-in, assembles the deploy request from DEPLOY_REQUEST.md, the app's
 // files, and the gitignored .env, sends it, and follows the deployment run
@@ -39,7 +39,8 @@
 // Sign-in tokens stay in local variables and are never echoed.
 // ===========================================================================
 
-import { readFileSync, readdirSync, lstatSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync, lstatSync, existsSync, mkdirSync, writeFileSync, unlinkSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { dirname, join, resolve, relative, basename, isAbsolute, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -107,6 +108,10 @@ const EXCLUDE_FILES = cfg(['exclusions', 'files'], null) || ['.env', '.env.*'];
 // --------------------------------------------------------------------------
 let appDir = process.cwd();
 let signoffFile = '';
+// --check: only probe that Keshet's deployment service is reachable from
+// this network, and exit. Run at the start of the deploy chain so a missing
+// VPN is found before any check runs, not after all of them.
+let checkOnly = false;
 {
   const args = process.argv.slice(2);
   for (let i = 0; i < args.length; i++) {
@@ -114,8 +119,10 @@ let signoffFile = '';
     if (a === '--signoff') {
       if (i + 1 >= args.length) fail(EXIT_LOCAL, '--signoff needs a file path after it.');
       signoffFile = args[++i];
+    } else if (a === '--check') {
+      checkOnly = true;
     } else if (a.startsWith('--')) {
-      fail(EXIT_LOCAL, `Unknown option: ${a}. Usage: send-deploy.mjs [--signoff FILE] [APP_DIR]`);
+      fail(EXIT_LOCAL, `Unknown option: ${a}. Usage: send-deploy.mjs [--check] [--signoff FILE] [APP_DIR]`);
     } else {
       appDir = a;
     }
@@ -125,10 +132,10 @@ let signoffFile = '';
 const isDir = (p) => { try { return lstatSync(p).isDirectory(); } catch { return false; } };
 const isFile = (p) => { try { return lstatSync(p).isFile(); } catch { return false; } };
 
-if (!isDir(appDir)) fail(EXIT_LOCAL, 'The app folder was not found, so nothing was sent.');
+if (!checkOnly && !isDir(appDir)) fail(EXIT_LOCAL, 'The app folder was not found, so nothing was sent.');
 appDir = resolve(appDir);
 const reqFile = join(appDir, 'DEPLOY_REQUEST.md');
-if (!isFile(reqFile)) {
+if (!checkOnly && !isFile(reqFile)) {
   fail(EXIT_LOCAL,
     'The deployment request file is missing from the app folder, so nothing was sent. The deployment details need collecting before the app can go to Keshet.');
 }
@@ -136,6 +143,87 @@ if (!isFile(reqFile)) {
 // --------------------------------------------------------------------------
 // Read the deployment request
 // --------------------------------------------------------------------------
+// --------------------------------------------------------------------------
+// HTTP, without curl: fetch with a timeout.
+//
+// Two different questions, two different fields, because conflating them is
+// what made a 404 read as an outage: `reached` says the service answered at
+// all, `ok` says the answer was a success (2xx). A network-level failure
+// comes back with reached:false and status 0; `timedOut` separates a service
+// that never answered from one this machine could not open a connection to.
+// --------------------------------------------------------------------------
+const http = async (method, path, body, timeoutSec, token) => {
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  try {
+    const res = await fetch(`${BASE_URL}${path}`, {
+      method,
+      headers,
+      ...(body !== undefined ? { body } : {}),
+      signal: AbortSignal.timeout(timeoutSec * 1000),
+    });
+    const text = await res.text();
+    let json = null;
+    try { json = JSON.parse(text); } catch { json = null; }
+    return {
+      reached: true,
+      ok: res.status >= 200 && res.status < 300,
+      status: res.status,
+      json,
+      empty: text.trim() === '',
+      timedOut: false,
+    };
+  } catch (err) {
+    return {
+      reached: false,
+      ok: false,
+      status: 0,
+      json: null,
+      empty: true,
+      timedOut: err?.name === 'TimeoutError',
+    };
+  }
+};
+
+// The facts a platform person needs to tell an outage from a wrong address:
+// which endpoint, what it answered, and which instance was asked. Appended to
+// every failure message, after the plain-language part.
+const detail = (path, status, extra = '') =>
+  `Details for the platform team: ${status === 0 ? 'no answer' : `HTTP ${status}`} from ${path} at ${BASE_URL}${extra !== '' ? ` (${extra})` : ''}.`;
+
+const HEALTH_PATH = '/api/monitor/check';
+const DEVICE_CODE_PATH = '/api/apps/auth/device-code';
+const DEVICE_TOKEN_PATH = '/api/apps/auth/device-token';
+const SEND_PATH = '/api/apps';
+const REFRESH_PATH = '/api/apps/auth/refresh';
+
+const jstr = (obj, key) => {
+  const v = obj?.[key];
+  return typeof v === 'string' ? v : '';
+};
+
+const sleep = (s) => new Promise((r) => setTimeout(r, s * 1000));
+
+// --------------------------------------------------------------------------
+// Check mode: reachability only. Everything below this point reads the app.
+// --------------------------------------------------------------------------
+const probeService = async () => {
+  const health = await http('GET', HEALTH_PATH, undefined, 10);
+  if (!health.reached) {
+    fail(EXIT_UNREACHABLE,
+      `Keshet's deployment service can't be reached at ${BASE_URL} from this network${health.timedOut ? ' - it did not answer in time' : ''}. Connect to the Keshet network (VPN or office) and try again. Nothing was sent and nothing is lost. ${detail(HEALTH_PATH, 0)}`);
+  }
+  if (!health.ok) {
+    say(`The service answered, but not with a healthy reply. ${detail(HEALTH_PATH, health.status)}`);
+  }
+  return health;
+};
+if (checkOnly) {
+  await probeService();
+  say(`Keshet's deployment service is reachable at ${BASE_URL}.`);
+  process.exit(0);
+}
+
 const reqText = readFileSync(reqFile, 'utf8');
 const reqLines = reqText.split(/\r?\n/);
 
@@ -350,65 +438,6 @@ const payload = {
   ...(signoff !== null ? { signoff } : {}),
 };
 
-// --------------------------------------------------------------------------
-// HTTP, without curl: fetch with a timeout.
-//
-// Two different questions, two different fields, because conflating them is
-// what made a 404 read as an outage: `reached` says the service answered at
-// all, `ok` says the answer was a success (2xx). A network-level failure
-// comes back with reached:false and status 0; `timedOut` separates a service
-// that never answered from one this machine could not open a connection to.
-// --------------------------------------------------------------------------
-const http = async (method, path, body, timeoutSec, token) => {
-  const headers = { 'Content-Type': 'application/json' };
-  if (token) headers.Authorization = `Bearer ${token}`;
-  try {
-    const res = await fetch(`${BASE_URL}${path}`, {
-      method,
-      headers,
-      ...(body !== undefined ? { body } : {}),
-      signal: AbortSignal.timeout(timeoutSec * 1000),
-    });
-    const text = await res.text();
-    let json = null;
-    try { json = JSON.parse(text); } catch { json = null; }
-    return {
-      reached: true,
-      ok: res.status >= 200 && res.status < 300,
-      status: res.status,
-      json,
-      empty: text.trim() === '',
-      timedOut: false,
-    };
-  } catch (err) {
-    return {
-      reached: false,
-      ok: false,
-      status: 0,
-      json: null,
-      empty: true,
-      timedOut: err?.name === 'TimeoutError',
-    };
-  }
-};
-
-// The facts a platform person needs to tell an outage from a wrong address:
-// which endpoint, what it answered, and which instance was asked. Appended to
-// every failure message, after the plain-language part.
-const detail = (path, status, extra = '') =>
-  `Details for the platform team: ${status === 0 ? 'no answer' : `HTTP ${status}`} from ${path} at ${BASE_URL}${extra !== '' ? ` (${extra})` : ''}.`;
-
-const HEALTH_PATH = '/api/monitor/check';
-const DEVICE_CODE_PATH = '/api/apps/auth/device-code';
-const DEVICE_TOKEN_PATH = '/api/apps/auth/device-token';
-const SEND_PATH = '/api/apps';
-
-const jstr = (obj, key) => {
-  const v = obj?.[key];
-  return typeof v === 'string' ? v : '';
-};
-
-const sleep = (s) => new Promise((r) => setTimeout(r, s * 1000));
 
 // --------------------------------------------------------------------------
 // Turning answers into plain language
@@ -448,6 +477,10 @@ const refuseHttp = (status, json, path) => {
   if (status === 401) {
     fail(EXIT_SIGNIN,
       `Keshet no longer accepts the sign-in - it has likely expired. Run the send again and sign in when the code appears. Nothing is lost. ${d}`);
+  }
+  if (status === 413) {
+    fail(EXIT_REFUSED,
+      `Keshet's service turned the app away as too large, even though it is under the limit the platform allows - that is a setting on Keshet's side, not anything in the app, and nothing should be left out to get past it. It needs the platform team; the builder did nothing wrong. ${d}`);
   }
   if (status === 403) {
     fail(EXIT_REFUSED,
@@ -502,25 +535,80 @@ const accepted = () => {
 // --------------------------------------------------------------------------
 // The send itself, from reachability to Keshet's final answer
 // --------------------------------------------------------------------------
+// --------------------------------------------------------------------------
+// The sign-in cache: ~/.kst-auth/deploy-tokens-<host>.json, owner-only.
+// Holds the access token, its expiry, and the renewal token. Never printed.
+// --------------------------------------------------------------------------
+const CACHE_DIR = process.env.KST_AUTH_TOKEN_CACHE_DIR || join(homedir(), '.kst-auth');
+const CACHE_FILE = join(CACHE_DIR, `deploy-tokens-${new URL(BASE_URL).host.replace(/[^a-z0-9.-]/gi, '_')}.json`);
+
+const readCache = () => {
+  try { return JSON.parse(readFileSync(CACHE_FILE, 'utf8')); } catch { return null; }
+};
+
+const saveSignIn = (json, displayName) => {
+  const prev = readCache();
+  const now = Math.floor(Date.now() / 1000);
+  const expiresIn = Number(json?.expiresIn) || 3600;
+  const record = {
+    accessToken: jstr(json, 'accessToken'),
+    refreshToken: jstr(json, 'refreshToken') || (prev?.refreshToken ?? ''),
+    expiresAt: now + expiresIn,
+    displayName: displayName || (prev?.displayName ?? ''),
+  };
+  try {
+    mkdirSync(CACHE_DIR, { recursive: true, mode: 0o700 });
+    writeFileSync(CACHE_FILE, JSON.stringify(record), { mode: 0o600 });
+  } catch {
+    // A cache that cannot be written only means the next attempt signs in again.
+  }
+};
+
+const forgetSignIn = () => { try { unlinkSync(CACHE_FILE); } catch { /* already gone */ } };
+
+// Returns { accessToken, displayName } or null. Silent renewal is attempted
+// once; any failure falls through to a fresh device sign-in.
+const loadSignIn = async () => {
+  const c = readCache();
+  if (c === null || typeof c.accessToken !== 'string') return null;
+  const now = Math.floor(Date.now() / 1000);
+  if (c.accessToken !== '' && Number(c.expiresAt) - now > 60) {
+    return { accessToken: c.accessToken, displayName: c.displayName || '' };
+  }
+  if (typeof c.refreshToken === 'string' && c.refreshToken !== '') {
+    const r = await http('POST', REFRESH_PATH, JSON.stringify({ refreshToken: c.refreshToken }), 30);
+    if (r.ok && jstr(r.json, 'accessToken') !== '') {
+      saveSignIn(r.json, c.displayName || '');
+      return { accessToken: jstr(r.json, 'accessToken'), displayName: c.displayName || '' };
+    }
+  }
+  forgetSignIn();
+  return null;
+};
+
 const main = async () => {
   say(`Checking that Keshet's deployment service is reachable at ${BASE_URL}...`);
-  const health = await http('GET', HEALTH_PATH, undefined, 10);
-  if (!health.reached) {
-    fail(EXIT_UNREACHABLE,
-      `Keshet's deployment service can't be reached at ${BASE_URL} from this network${health.timedOut ? ' - it did not answer in time' : ''}. Connecting to the Keshet network (VPN or office) and sending again usually fixes this. Nothing was sent and nothing is lost. ${detail(HEALTH_PATH, 0)}`);
-  }
-  // A service that answers anything is reachable, so this is not fatal - but
-  // an unhealthy answer belongs in the transcript, because the sign-in that
-  // follows is the call that will explain itself properly.
-  if (!health.ok) {
-    say(`The service answered, but not with a healthy reply. ${detail(HEALTH_PATH, health.status)}`);
-  }
+  // A service that answers anything is reachable; an unhealthy answer is
+  // said out loud and the sign-in that follows explains itself properly.
+  await probeService();
 
   // ------------------------------------------------------------------------
   // Sign the builder in (device sign-in via the service's own endpoints).
   // IIS (http.sys) rejects body-less POSTs with HTTP 411, so send an empty
   // JSON body even though the endpoint takes no input.
   // ------------------------------------------------------------------------
+  let token = '';
+  let builderName = 'the builder';
+  // A sign-in from a previous attempt is reused while it lasts, and renewed
+  // silently while the renewal token lasts - a failed send must not cost the
+  // builder another code. Same file layout as scripts/device-login.sh.
+  const cached = await loadSignIn();
+  if (cached !== null) {
+    token = cached.accessToken;
+    builderName = cached.displayName || builderName;
+    say(`Still signed in as ${builderName} from the previous attempt.`);
+  }
+  if (token === '') {
   say('Keshet needs the builder to sign in before the app can be sent.');
   const start = await http('POST', DEVICE_CODE_PATH, '{}', 30);
   if (!start.reached) {
@@ -562,8 +650,6 @@ const main = async () => {
   // The wait must never fall silent: a heartbeat shows the sign-in window is
   // still open, and a run of failed polls is said out loud instead of being
   // indistinguishable from a builder who has not signed in yet.
-  let token = '';
-  let builderName = 'the builder';
   const deadline = Date.now() + expiresIn * 1000;
   let lastHeartbeat = Date.now();
   let pollErrors = 0;
@@ -590,6 +676,7 @@ const main = async () => {
     if (status === 'authenticated') {
       token = jstr(poll.json, 'accessToken');
       builderName = jstr(poll.json, 'displayName') || jstr(poll.json, 'username') || 'the builder';
+      saveSignIn(poll.json, builderName);
       break;
     }
     if (status === 'pending') continue;
@@ -607,6 +694,7 @@ const main = async () => {
       'The sign-in code expired before it was used. Nothing is lost - run the send again for a fresh code.');
   }
   say(`Signed in as ${builderName}.`);
+  }
 
   // ------------------------------------------------------------------------
   // Send, then follow the run until Keshet has an answer
@@ -617,6 +705,7 @@ const main = async () => {
     fail(EXIT_UNREACHABLE,
       `The connection to Keshet ${sent.timedOut ? 'timed out' : 'dropped'} while sending. It is safe to run the send again - the identical app sent twice is recognised as the same request. ${detail(SEND_PATH, 0)}`);
   }
+  if (sent.status === 401) forgetSignIn();
   if (!sent.ok) refuseHttp(sent.status, sent.json, SEND_PATH);
   if (sent.json === null) {
     fail(EXIT_UNREACHABLE,

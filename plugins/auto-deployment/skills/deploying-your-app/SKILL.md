@@ -1,6 +1,6 @@
 ---
 name: deploying-your-app
-description: Load whenever the builder expresses deploy intent in any wording - "deploy", "publish", "ship it", "put it live", "share it with the team", "send it", "give them a link", or anything that means another person needs to open the app - and after any conversation that changed code, to decide which deployment checks must re-run. You then act as the orchestrator: you launch the deployment agents as sub-agents in a fixed order, talk to the builder yourself when an agent needs their answer, and hand the run record to the verifier, which is the only thing that ever sends. The builder never names an agent; this skill is how their intent becomes the right sequence of checks. V:0.1.11
+description: Load whenever the builder expresses deploy intent in any wording - "deploy", "publish", "ship it", "put it live", "share it with the team", "send it", "give them a link", or anything that means another person needs to open the app - and after any conversation that changed code, to decide which deployment checks must re-run. You then act as the orchestrator: you launch the deployment agents as sub-agents in a fixed order, talk to the builder yourself when an agent needs their answer, and hand the run record to the verifier, which is the only thing that ever sends. The builder never names an agent; this skill is how their intent becomes the right sequence of checks. V:0.1.12
 ---
 
 # Deploying your app - you are the orchestrator
@@ -60,7 +60,17 @@ on skipping: **if you are unsure whether an agent needs to re-run, re-run
 it.** Re-running is cheap. Skipping is not, because a skipped check surfaces
 later as a refused deploy or, worse, as an app that shipped unchecked.
 
-## Before anything else: the project must have version history
+## Before anything else: Keshet must be reachable, and the project must have version history
+
+Run the send tooling in check mode first - `send-deploy.sh --check`
+(macOS/Linux) or `send-deploy.ps1 --check` (Windows) from this plugin's
+`scripts/` folder. It only asks whether Keshet's deployment service answers
+from this network and exits. If it does not, stop before any agent runs and
+tell the builder in one sentence: "Keshet's deployment service isn't
+reachable from here - usually that means the Keshet VPN isn't connected.
+Connect it and tell me, and I'll carry on." Finding this out after seven
+checks is the expensive way.
+
 
 Before either situation proceeds, check the project is a local git repo:
 `git status` in the project root. If there is no repo - or git itself is not
@@ -127,7 +137,7 @@ Its shape:
     "deployment": {
       "verdict": "approved",
       "finishedAt": "2026-09-15T09:03:10Z",
-      "treeDigest": "<git HEAD>+<sha256 of `git status --porcelain` and the diff of uncommitted changes>",
+      "treeDigest": "<git HEAD>+<sha256 of `git status --porcelain` and the diff of uncommitted changes, both computed with DEPLOY_REQUEST.md, .env* and .kst-deploy/ left out>",
       "whatWasChecked": "...",
       "findings": []
     }
@@ -146,7 +156,11 @@ Its shape:
 1. Read the record if it exists. Discard it - delete the file and start
    fresh - if `startedAt` is more than 24 hours old, or if it will not
    parse. Say nothing to the builder about either.
-2. Compute the current tree digest the same way the entries do.
+2. Compute the current tree digest the same way the entries do. The digest
+   leaves out `DEPLOY_REQUEST.md`, `.env*` and `.kst-deploy/`: agents write
+   the request file as part of their job (deployment, secrets-manager,
+   access-manager, create-repo all do), and that must not void the checks
+   that ran before them. Code changes are what stale a result.
 3. If `pending` is set (a question asked in an earlier conversation that
    was never answered), ask it again now, in one sentence, and wait. When
    the builder answers, write their words into `pending.answer`, launch
@@ -188,8 +202,10 @@ they ran, and everything downstream (the verifier, IT, the builder) then
 trusts a check that never happened. If the `Agent` tool is unavailable to
 you, or launching an agent fails, stop and report **not approved**: "I
 could not run the deployment checks on this machine" - never carry on
-inline. The same goes for the send: only the verifier, launched as an agent,
-runs the send tooling. You never run it from your own shell.
+inline. The send is different: it happens in this conversation, under the
+`verifying-and-sending` skill, after the seven agents are in the run
+record - never before, and never from a shell of your own outside that
+skill.
 
 ## The chain, in order
 
@@ -201,11 +217,11 @@ that no longer exists by the time the next one runs.
 1. deployment
 2. secrets-manager
 3. auth
-4. access-manager
-5. app-logging
+4. app-logging
+5. access-manager
 6. security-review
 7. create-repo
-8. verifier
+8. verifier  (a skill you load, not an agent - see below)
 ```
 
 Why this order:
@@ -213,8 +229,14 @@ Why this order:
 - **secrets-manager before auth**, because auth wiring often needs a secret
   and would otherwise hardcode one - the exact thing secrets-manager exists
   to remove.
+- **app-logging right after auth**, so every agent that changes code -
+  deployment, secrets-manager, auth, app-logging - has run before anything
+  that only reads it. A code change after a read-only check voids that check,
+  so the mutators go first and the validators run once, against a tree that
+  is finished.
 - **access-manager before security-review**, so the review sees the real
-  audience rather than a placeholder.
+  audience rather than a placeholder. It writes only the request file, which
+  the digest leaves out, so it voids nothing before it.
 - **security-review after every agent that changes code**, so it reads the
   finished state. A review that runs early reviews something that no longer
   exists.
@@ -223,7 +245,10 @@ Why this order:
   point every agent that writes into the deployment request has written into
   it, so create-repo sees that request in its final form.
 - **verifier last, always.** It is the only thing that may hand work to the
-  Keshet deployment service. Nothing else calls it, including you.
+  Keshet deployment service. It is not an agent: when the seven agents are
+  in the run record, you load the `verifying-and-sending` skill and follow
+  it here, in this conversation, because the send prints a sign-in code the
+  builder has to see the moment it appears. No agent runs the send.
 
 When only some agents re-run after a change, they still run in this relative
 order among themselves. If security-review re-runs, it re-runs after every
@@ -265,7 +290,7 @@ agent, and a result without a timestamp cannot be checked for staleness.
 | app-logging | The current source tree and the list of user-facing actions the app has | Logs exist for user actions, errors, and data access, and the configuration will actually deliver them - not just that logging lines were added |
 | security-review | The entire current state of the app, not a diff | The whole finished tree was read for leaked secrets and misconfigurations, and anything found was fixed and re-checked |
 | create-repo | Whatever the app is currently called, and everything the deployment interview established about what it is for | The builder has approved the app's name and that name is written into `DEPLOY_REQUEST.md`, the deployment details are complete, and the description and tags are recorded |
-| verifier | The full run record: every agent above, its verdict, its finished-at timestamp, its what-was-checked line, and its findings, plus which version of the code each ran against | The verifier takes it from here. Its approval is the only "ready" that exists |
+| verifier (the `verifying-and-sending` skill, loaded here) | The run record on disk: every agent above, its verdict, its finished-at timestamp, its what-was-checked line, its findings and its tree digest | The verifier takes it from here. Its approval is the only "ready" that exists |
 
 If an agent reports **not approved**, stop the chain there. Fix what it
 found - with the builder where the fix is theirs to decide, on their behalf

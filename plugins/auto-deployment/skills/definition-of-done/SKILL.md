@@ -1,6 +1,6 @@
 ---
 name: definition-of-done
-description: Load before reporting that ANY piece of work is finished, and always before sending an app to Keshet. Trigger on "is it ready", "are we done", "send it", "publish", or whenever you are about to say something is complete. V:0.1.11
+description: Load before reporting that ANY piece of work is finished, and always before sending an app to Keshet. Trigger on "is it ready", "are we done", "send it", "publish", or whenever you are about to say something is complete. V:0.1.12
 ---
 
 # Definition of done
@@ -52,13 +52,20 @@ emitted its sign-off. That is the whole answer, and it is not yours to give -
 the verifier gives it.
 
 ```
-deployment → secrets-manager → auth → access-manager → app-logging
+deployment → secrets-manager → auth → app-logging → access-manager
                                                             ↓
                                         security-review → verifier
 ```
 
 The verifier is the only thing that may hand work to Keshet. If it has not
 approved, the app does not go, however certain you are.
+
+## Central monitoring is part of every app
+
+Every deployed app ships its logs to Keshet's central monitoring through
+the setting the platform places on the running app. That wiring is part of
+done: it is never removed, never made "console only for now", and never
+offered as something to drop. An app without it is not ready to send.
 
 ## The user-management widget is part of every app
 

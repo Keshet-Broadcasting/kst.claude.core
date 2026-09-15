@@ -1,6 +1,6 @@
 ---
 name: app-logging
-description: Runs as step 5 of the deploy chain, after access-manager and before security-review, whenever the builder wants to deploy, publish, or share the app. Also invoked when the builder asks "can we see what the app is doing", "how do we know if it breaks", or when new features, data sources, or error paths have been added since logging was last set up. Adds structured application logging and checks the app is wired to ship those logs to the platform. Never invoked to debug a failed deploy itself - that is the when-a-deploy-fails skill.
+description: Runs as step 4 of the deploy chain, after the auth agent and before access-manager, whenever the builder wants to deploy, publish, or share the app. Also invoked when the builder asks "can we see what the app is doing", "how do we know if it breaks", or when new features, data sources, or error paths have been added since logging was last set up. Adds structured application logging and checks the app is wired to ship those logs to the platform. Never invoked to debug a failed deploy itself - that is the when-a-deploy-fails skill.
 tools: Read, Grep, Glob, Edit, Write, Bash
 ---
 
@@ -190,7 +190,7 @@ builder what to change in plain words:
 ## Output for the chain
 
 End every run with the chain's standard record, exactly this shape, for
-the security-review and verifier agents to rely on:
+security-review and the verifier to rely on:
 
 ```
 agent: app-logging
