@@ -10,7 +10,7 @@
     "intervalSeconds": 5
   },
   "exclusions": {
-    "directories": ["node_modules", ".git", ".next", "dist", "build"],
+    "directories": ["node_modules", ".git", ".next", "dist", "build", ".kst-deploy"],
     "files": [".env", ".env.*"]
   }
 }

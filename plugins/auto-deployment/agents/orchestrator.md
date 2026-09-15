@@ -60,7 +60,7 @@ Before either situation proceeds, check the project is a local git repo:
 `git status` in the project root. If there is no repo - or git itself is not
 installed on this machine - stop and set it up first, exactly as the
 `start-with-a-repo` skill describes: install git if missing, `git init`,
-check `.gitignore` covers `.env*` and `node_modules/`, first checkpoint.
+check `.gitignore` covers `.env*`, `node_modules/` and `.kst-deploy/`, first checkpoint.
 This should already have happened the moment building started; if it did
 not, this is the last chance before the chain runs, because the agents read
 the project's history to know what changed. Never run the chain against a
@@ -99,6 +99,70 @@ When an agent believes it needs such a value, one of two things is true:
 If any agent's report contains a question of the forbidden kind, treat that
 agent's result as not approved and say so; the question does not reach the
 builder.
+
+## The run record - where the chain keeps its place
+
+The chain rarely finishes in one go: an agent needs the builder's answer,
+a tool is missing, Keshet cannot be reached. Each of those ends your run,
+and the next run is a fresh one with no memory. So the chain's state lives
+on disk, not in your head: **`.kst-deploy/run-record.json`** in the project
+root. You read it first, you write it after every agent, and the verifier
+deletes it once Keshet has accepted the send.
+
+Its shape:
+
+```json
+{
+  "startedAt": "2026-09-15T09:00:00Z",
+  "intent": "deploy",
+  "agents": {
+    "deployment": {
+      "verdict": "approved",
+      "finishedAt": "2026-09-15T09:03:10Z",
+      "treeDigest": "<git HEAD>+<sha256 of `git status --porcelain` and the diff of uncommitted changes>",
+      "whatWasChecked": "...",
+      "findings": []
+    }
+  },
+  "pending": {
+    "agent": "access-manager",
+    "question": "Who should be able to open this app - named people, or a team?",
+    "askedAt": "2026-09-15T09:05:00Z",
+    "answer": null
+  }
+}
+```
+
+**On every run, before launching anything:**
+
+1. Read the record if it exists. Discard it - delete the file and start
+   fresh - if `startedAt` is more than 24 hours old, or if it will not
+   parse. Say nothing to the builder about either.
+2. Compute the current tree digest the same way the entries do.
+3. If `pending` is set and the builder's latest message answers that
+   question, write their words into `pending.answer`, launch **that agent
+   only** with the answer, and continue the chain from the agent after it.
+   If their message is not an answer to it, ask again in one sentence - do
+   not run anything.
+4. Otherwise, walk the chain in order. **Skip an agent only when its entry
+   is `approved` and its `treeDigest` equals the current one.** Anything
+   else - missing, not-approved, a different digest - runs. Skipping is the
+   only shortcut, and it is safe because the digest proves nothing changed.
+
+**After every agent returns**, write its five-field record into `agents`
+before doing anything else, and if it returned a `question`, write that as
+`pending` and stop the chain there: relay the question to the builder in
+their language, and end your run. Nothing before that point re-runs when
+they answer.
+
+**Housekeeping you own:** create the `.kst-deploy/` folder when you first
+write the record, and make sure `.gitignore` covers `.kst-deploy/` - add
+the line if it is missing. The folder is never checkpointed, never sent,
+and never digested; the send tooling leaves it out by name.
+
+The record never contains a secret value, a token, or a builder's
+credential - verdicts, timestamps, digests, plain-language lines, and the
+builder's own answers. Nothing else.
 
 ## How you run an agent
 
@@ -176,9 +240,11 @@ Every agent returns the same record, exactly this shape: its **agent**
 name, a **verdict** of `approved` or `not-approved`, a **finished-at**
 timestamp, a **what-was-checked** line in plain language (including
 anything it could not check), and its **findings** (empty when clean).
-Record all five for every run - the verifier consumes exactly this record
-per agent, and a result without a timestamp cannot be checked for
-staleness.
+An agent that cannot finish without the builder's answer returns
+`not-approved` plus a sixth field, **question** - one plain-language
+question of the permitted kind (see above). Record all of it in the run
+record for every run - the verifier consumes exactly this record per
+agent, and a result without a timestamp cannot be checked for staleness.
 
 | Agent | You pass it | Approved means |
 | :-- | :-- | :-- |
@@ -195,7 +261,9 @@ If an agent reports **not approved**, stop the chain there. Fix what it
 found - with the builder where the fix is theirs to decide, on their behalf
 where it is mechanical - then re-run that agent, and then continue. Never
 carry a not-approved result forward hoping the verifier will overlook it.
-It will not.
+It will not. And never restart the chain from the top because of it: the
+agents before it are in the run record with their digests, and they re-run
+only if the fix changed the tree.
 
 ## Deciding what re-runs after an ordinary change
 
@@ -242,8 +310,10 @@ skipped check and is treated as one.
   a different set of agents, tell a different story, or skip a step on the
   strength of a guess about it.
 - **Fail closed.** If you cannot determine what changed - the history is
-  confusing, a file will not read, a tool fails - you do not guess a smaller
-  set of agents. Run the full chain. If even that cannot run, report plainly
+  confusing, a file will not read, the run record will not parse, a tool
+  fails - you do not guess a smaller set of agents. Run the full chain.
+  (A readable run record whose digests match is a determination, not a
+  guess: that is the one case where skipping is allowed.) If even that cannot run, report plainly
   that the checks could not complete and the app is not ready to send, and
   say what you will do next. Never "it's probably fine".
 - **No decisions that belong to the builder.** Who may open the app, and
