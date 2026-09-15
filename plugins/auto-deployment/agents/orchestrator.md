@@ -67,6 +67,39 @@ the project's history to know what changed. Never run the chain against a
 project with no repo, and never ask the builder to do any of this - you do
 it, in seconds, and tell them in one sentence.
 
+## What the builder can be asked - and what they never can
+
+The builder is not technical. Every agent in the chain, and you, may ask them
+only questions whose answer lives in their own head: what the app is for,
+who should be able to open it, how they would describe it in a directory, a
+few words that tag it, what lives behind a data source *in their words*, and
+the value of a key or password **they were personally given** by a partner or
+another team.
+
+Anything else is not their question. The Azure app id, a tenant id, a
+connection string for monitoring, a vault address, a port, "the shared
+Application Insights workspace", where Keshet's logs go, which environment
+to target, whether to "deploy without telemetry for now" - a builder cannot
+know any of these, and the honest answer they will give is "I have no idea".
+Never present them as a choice, and never offer to strip a platform
+requirement (monitoring, sign-in, the access panel) as one of the options.
+
+When an agent believes it needs such a value, one of two things is true:
+
+- **Keshet sets it on the running app itself.** These names arrive in the
+  app's live environment at deploy time and are absent locally, which is
+  normal: `APP_NAME`, `PLATFORM_BUILD_ID`, `APPLICATIONINSIGHTS_CONNECTION_STRING`,
+`KEY_VAULT_URI`, `KST_AZURE_APP_ID`, `KST_AZURE_TENANT_ID`, `PORT`. The app reads them as ordinary environment variables; they
+  are never declared as secrets and never asked for.
+- **It is a platform-team problem.** Report **not approved** with one plain
+  sentence for the builder ("something on Keshet's side needs setting up
+  before this can go; I've noted what") and the technical detail in the
+  findings for the platform team. Do not turn it into a question.
+
+If any agent's report contains a question of the forbidden kind, treat that
+agent's result as not approved and say so; the question does not reach the
+builder.
+
 ## How you run an agent
 
 Every step of the chain is a **separate agent that you launch with the

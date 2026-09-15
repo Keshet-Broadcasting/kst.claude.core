@@ -172,6 +172,20 @@ describe('send-deploy.mjs local checks', () => {
     for (const field of STAMPED_FIELDS) expect(run.stdout).toContain(field);
   });
 
+  it('refuses a platform-provided variable declared as a secret, without asking for a value', () => {
+    const request = filledTemplate().replace(
+      /^declared-secrets:.*$/m,
+      'declared-secrets: APPLICATIONINSIGHTS_CONNECTION_STRING, KST_AZURE_APP_ID',
+    );
+    const run = runSend(request);
+    dirs.push(run.dir);
+    expect(run.status).toBe(EXIT_LOCAL);
+    expect(run.stdout).toContain('APPLICATIONINSIGHTS_CONNECTION_STRING');
+    expect(run.stdout).toContain('KST_AZURE_APP_ID');
+    expect(run.stdout).toContain('Keshet sets');
+    expect(run.stdout).not.toContain('private settings file');
+  });
+
   it('passes the local checks on a filled template and proceeds to the send', () => {
     const run = runSend(filledTemplate());
     dirs.push(run.dir);

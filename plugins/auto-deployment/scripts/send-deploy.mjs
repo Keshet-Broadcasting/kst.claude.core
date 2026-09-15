@@ -205,6 +205,26 @@ const INFORMATION_TYPE = DATA_SOURCES === 'none'
 // Secret values: from .env, straight into memory, only the declared names
 // --------------------------------------------------------------------------
 const declaredKeys = DECLARED_RAW.replace(/\s/g, '').split(',').filter((k) => k !== '');
+
+// Names Keshet sets on the running app itself (platform/templates/steps/
+// app-config.yml and configure-auth.yml). They are never secrets the builder
+// holds: a builder cannot have a value for them, so an agent that declared one
+// would end up asking the builder a question nobody on their side can answer.
+// Refuse here, by name, before anyone is asked anything.
+const PLATFORM_PROVIDED = [
+  'APP_NAME',
+  'PLATFORM_BUILD_ID',
+  'APPLICATIONINSIGHTS_CONNECTION_STRING',
+  'KEY_VAULT_URI',
+  'KST_AZURE_APP_ID',
+  'KST_AZURE_TENANT_ID',
+  'PORT',
+];
+const platformDeclared = declaredKeys.filter((k) => PLATFORM_PROVIDED.includes(k));
+if (platformDeclared.length > 0) {
+  fail(EXIT_LOCAL,
+    `These names are not secrets the builder holds - Keshet sets them on the running app itself: ${platformDeclared.join(', ')}. Remove them from the declared secrets (the app keeps reading them as ordinary environment variables) and send again. Nothing was sent, and the builder does not need to supply anything.`);
+}
 let envShared = {};
 if (declaredKeys.length > 0) {
   const envFile = join(appDir, '.env');

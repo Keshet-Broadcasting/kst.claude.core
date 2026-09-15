@@ -1,6 +1,6 @@
 ---
 name: secrets-in-your-app
-description: Load this skill whenever the user mentions API keys, passwords, tokens, connection strings, `.env` files, or connecting the app to any other system - a database, an AI service, SharePoint, an internal API. Trigger immediately when someone is about to put a key, password, or URL directly into the code, and when they say "the API key isn't working", "it can't reach the database", or "it works on my machine but not after deploying". V:0.1.8
+description: Load this skill whenever the user mentions API keys, passwords, tokens, connection strings, `.env` files, or connecting the app to any other system - a database, an AI service, SharePoint, an internal API. Trigger immediately when someone is about to put a key, password, or URL directly into the code, and when they say "the API key isn't working", "it can't reach the database", or "it works on my machine but not after deploying". V:0.1.9
 ---
 
 # Secrets in your app
@@ -85,6 +85,15 @@ The deployment request lists secret **names** - `SHAREPOINT_CLIENT_SECRET`,
 `OPENAI_API_KEY` - and never values. Those names are exactly the names in
 `.env`: same spelling, same list, nothing extra on either side.
 
+## Names that are never secrets: what Keshet sets on the app itself
+
+Some environment variables the app reads are placed there by Keshet at deploy
+time, not by the builder: `APP_NAME`, `PLATFORM_BUILD_ID`, `APPLICATIONINSIGHTS_CONNECTION_STRING`,
+`KEY_VAULT_URI`, `KST_AZURE_APP_ID`, `KST_AZURE_TENANT_ID`, `PORT`. They are not declared, not put in `.env`,
+and not asked for - locally they are absent and the app must cope with that.
+The builder cannot know their values, so never ask; if one looks required,
+that is a code fix or a platform-team note, never a question.
+
 ## What to do when the app needs a secret
 
 1. **Give it a name.** Uppercase, words separated by underscores, describing
@@ -97,8 +106,9 @@ The deployment request lists secret **names** - `SHAREPOINT_CLIENT_SECRET`,
    code, no fetching, no caching. The name arrives filled in, locally and in
    production alike.
 4. **Ask the builder for the value and put it in `.env` under that name.**
-   This is the one place a real value belongs, and writing it there is your
-   job, not theirs. Confirm it by name only - "I've saved your SharePoint key
+   This applies only to a value the builder was personally given - a partner
+   key, a password from another team. This is the one place a real value
+   belongs, and writing it there is your job, not theirs. Confirm it by name only - "I've saved your SharePoint key
    into the app's private settings file" - and never repeat the value back,
    not even the first few characters.
 
