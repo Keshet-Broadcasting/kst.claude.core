@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -184,6 +184,24 @@ describe('send-deploy.mjs local checks', () => {
     expect(run.stdout).toContain('KST_AZURE_APP_ID');
     expect(run.stdout).toContain('Keshet sets');
     expect(run.stdout).not.toContain('private settings file');
+  });
+
+  it('leaves the deploy run record out of the tree it sends', () => {
+    // The tree is DEPLOY_REQUEST.md + package.json = 2 files. With the cap at
+    // 2, a record swept in would push it to 3 and be refused before the send.
+    const dir = mkdtempSync(join(tmpdir(), 'send-deploy-test-'));
+    dirs.push(dir);
+    writeFileSync(join(dir, 'DEPLOY_REQUEST.md'), filledTemplate());
+    writeFileSync(join(dir, 'package.json'), '{}');
+    mkdirSync(join(dir, '.kst-deploy'));
+    writeFileSync(join(dir, '.kst-deploy', 'run-record.json'), '{"agents":[]}');
+    const result = spawnSync(process.execPath, [SCRIPT, dir], {
+      encoding: 'utf8',
+      env: { ...process.env, KST_AUTH_API_BASE_URL: 'http://127.0.0.1:9', KST_DEPLOY_MAX_FILES: '2' },
+      timeout: 30_000,
+    });
+    expect(result.status).toBe(EXIT_UNREACHABLE);
+    expect(result.stdout ?? '').not.toContain('far more files');
   });
 
   it('passes the local checks on a filled template and proceeds to the send', () => {

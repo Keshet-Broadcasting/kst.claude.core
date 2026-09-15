@@ -90,7 +90,7 @@ else
   check_cfg '.limits.maxBytes' '10485760' "limits.maxBytes is 10485760 (10 MB)"
   check_cfg '.polling.count' '60' "polling.count is 60"
   check_cfg '.polling.intervalSeconds' '5' "polling.intervalSeconds is 5"
-  check_cfg '.exclusions.directories | sort | join(",")' '.git,.next,build,dist,node_modules' \
+  check_cfg '.exclusions.directories | sort | join(",")' '.git,.kst-deploy,.next,build,dist,node_modules' \
     "exclusions.directories is the sign-off digest's list"
   check_cfg '.exclusions.files | sort | join(",")' '.env,.env.*' \
     "exclusions.files is .env and .env.*"

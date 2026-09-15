@@ -39,10 +39,14 @@ probably passed" is the exact failure you exist to prevent.
 
 ## Step 1 - confirm every agent ran and approved, on the current code
 
-You receive the run record from the orchestrator: for each agent, the
-chain's standard record - its agent name, its verdict (`approved` or
-`not-approved`), its finished-at timestamp, its what-was-checked line, and
-its findings. Check all of this:
+You receive the run record from the orchestrator - it is the file
+`.kst-deploy/run-record.json` in the project root, and you read it from
+there rather than from the orchestrator's summary of it. For each agent it
+holds the chain's standard record - its agent name, its verdict (`approved`
+or `not-approved`), its finished-at timestamp, the tree digest it ran
+against, its what-was-checked line, and its findings. If the file is
+missing or will not parse, that is a failed verification: hand back to the
+orchestrator to run the chain. Check all of this:
 
 - **Every required agent is present**: deployment, secrets-manager, auth,
   access-manager, app-logging, security-review. If the orchestrator ran any
@@ -57,8 +61,9 @@ its findings. Check all of this:
   what may be skipped and does not take the record's word for it, so a
   doubtful "not applicable" fails here rather than there.
 - **No result is stale.** A result is stale if any file in the app changed
-  after that agent finished - compare each agent's timestamp against the
-  latest change to the tree. A stale result is not approved, no matter what
+  after that agent finished - compare each agent's recorded tree digest
+  against the tree as it stands now, and its timestamp against the latest
+  change to the tree. A stale result is not approved, no matter what
   it said when it was fresh, because it describes an app that no longer
   exists. A one-line fix counts. A formatting change counts.
 
@@ -198,7 +203,7 @@ on the Keshet side, and an extra field or a missing one is a refusal:
 - `treeDigest` is what makes the record checkable rather than merely
   present. Compute it over **exactly the set of files you are about to
   send**: apply the exclusions first (`node_modules/`, `.git/`, `.next/`,
-  `dist/`, `build/`, and `.env` along with every `.env.*`), then take the
+  `dist/`, `build/`, `.kst-deploy/`, and `.env` along with every `.env.*`), then take the
   sorted list of (path, sha256 of the file's decoded bytes) pairs and digest
   that. Decoded bytes, not the transport encoding. Keshet recomputes the
   same digest over the same set and refuses on any mismatch, so digesting a
@@ -292,7 +297,7 @@ Its exit code is the outcome, and you act on it and on nothing else:
 
 | Exit | Meaning | What you do |
 | :-- | :-- | :-- |
-| 0 | Accepted - the app is with Keshet; the automatic checks and IT review follow | Tell the builder it is sent, in the wording below |
+| 0 | Accepted - the app is with Keshet; the automatic checks and IT review follow | Delete `.kst-deploy/run-record.json` - this run is finished - then tell the builder it is sent, in the wording below |
 | 2 | Refused - the reason was printed | Relay the printed explanation verbatim, then act on it (below) |
 | 3 | Keshet could not be reached, or gave no final answer | Say so plainly; running the send again is safe |
 | 4 | Sign-in failed or timed out | Run the send again; a fresh sign-in code appears |
@@ -301,6 +306,11 @@ Its exit code is the outcome, and you act on it and on nothing else:
 If the script is missing, will not start, or exits with a code not in this
 table, that is **not approved**: no way to send is a platform problem to
 report, never a gap to bridge by hand.
+
+On every outcome other than 0 the run record stays where it is. The
+agents' results are still true of this tree, and the next attempt - after
+a tool is installed, after Keshet is reachable again, after a refusal is
+acted on - resumes from them instead of interviewing the builder again.
 
 ### The builder's sign-in travels with the request, never through you
 

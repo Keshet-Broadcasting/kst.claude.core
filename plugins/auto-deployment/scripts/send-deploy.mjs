@@ -99,7 +99,7 @@ const POLL_INTERVAL = parseInt(process.env.KST_DEPLOY_POLL_INTERVAL || '', 10)
 
 // The exclusion list - the same list the sign-off digest uses.
 const EXCLUDE_DIRS = cfg(['exclusions', 'directories'], null)
-  || ['node_modules', '.git', '.next', 'dist', 'build'];
+  || ['node_modules', '.git', '.next', 'dist', 'build', '.kst-deploy'];
 const EXCLUDE_FILES = cfg(['exclusions', 'files'], null) || ['.env', '.env.*'];
 
 // --------------------------------------------------------------------------
