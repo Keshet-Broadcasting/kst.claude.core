@@ -1,6 +1,6 @@
 ---
 name: definition-of-done
-description: Load before reporting that ANY piece of work is finished, and always before sending an app to Keshet. Trigger on "is it ready", "are we done", "send it", "publish", or whenever you are about to say something is complete. V:0.1.12
+description: Load before reporting that ANY piece of work is finished, and always before sending an app to Keshet. Trigger on "is it ready", "are we done", "send it", "publish", or whenever you are about to say something is complete. V:0.1.13
 ---
 
 # Definition of done
@@ -52,9 +52,9 @@ emitted its sign-off. That is the whole answer, and it is not yours to give -
 the verifier gives it.
 
 ```
-deployment → secrets-manager → auth → app-logging → access-manager
+deployment → secrets-manager → auth → app-logging → choosing the audience
                                                             ↓
-                                        security-review → verifier
+                   verifier ← settling the name ← security-review
 ```
 
 The verifier is the only thing that may hand work to Keshet. If it has not
@@ -109,15 +109,16 @@ themselves.
 It may not mean **"I looked and it seemed fine."** Each agent has something
 specific to confirm, and confirming it means checking, not assuming:
 
-| Agent | Approved means |
+| Step | Approved means |
 | :-- | :-- |
 | deployment | The app matches the build contract and the deployment request is complete |
 | secrets-manager | No secret remains in the source, and every secret the app needs is declared by name |
 | auth | The app passes the end user's own sign-in through to every data source |
-| access-manager | The builder made an explicit choice about who may open the app |
+| choosing the audience (a step of the `deploying-your-app` skill, recorded as `access-manager`) | The builder made an explicit choice about who may open the app |
 | app-logging | The logs exist and will actually arrive, not just that logging code was added |
 | security-review | The whole finished state was read, not the last change |
-| verifier | Every agent above is present and approved, and the user-management widget is present and wired |
+| settling the name (a step of the `deploying-your-app` skill, recorded as `create-repo`) | The builder approved the app's name, it is written into the deployment request, and the request is complete |
+| verifier | Every step above is present and approved, and the user-management widget is present and wired |
 
 ## The sign-off
 

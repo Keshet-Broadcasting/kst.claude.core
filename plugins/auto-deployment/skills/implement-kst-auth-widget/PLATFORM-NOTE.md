@@ -34,7 +34,7 @@ Both layers can be present. Neither substitutes for the other:
 | Inside - what may this person do in it? | This widget | After they are in | Deliverable #17, in-app half |
 
 **Deliverable #17 must state which of the two it addresses** before the
-access-manager agent is written.
+audience step (the former access-manager agent) is written.
 
 **The answer: both, on one screen.** That is what Keshet demonstrated and
 what Keshet expects. It does not merge the two layers - they are still enforced in
