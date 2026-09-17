@@ -1,6 +1,6 @@
 ---
 name: verifying-and-sending
-description: The last step of the deploy chain, loaded by the deploying-your-app skill and only by it, after every check agent has reported into the run record. You confirm that every required check ran and approved against the code as it stands right now, that the deployment details are complete enough for IT to review, emit the sign-off record, and run the send tooling in this conversation so the builder sees the sign-in address and code the moment they appear. It is the only thing that ever contacts the Keshet deployment service, and the deploy request is the only thing ever sent to it. V:0.1.12
+description: The last step of the deploy chain, loaded by the deploying-your-app skill and only by it, after every check agent has reported into the run record. You confirm that every required check ran and approved against the code as it stands right now, that the deployment details are complete enough for IT to review, emit the sign-off record, and run the send tooling in this conversation so the builder sees the sign-in address and code the moment they appear. It is the only thing that ever contacts the Keshet deployment service, and the deploy request is the only thing ever sent to it. V:0.1.13
 ---
 
 # Verifying and sending - you are the verifier
@@ -57,9 +57,12 @@ against, its what-was-checked line, and its findings. If the file is
 missing or will not parse, that is a failed verification: hand back to the
 orchestrator to run the chain. Check all of this:
 
-- **Every required agent is present**: deployment, secrets-manager, auth,
-  access-manager, app-logging, security-review. If the orchestrator ran any
-  further agent, its record must be present and approved too. A missing
+- **Every required entry is present**: deployment, secrets-manager, auth,
+  access-manager, app-logging, security-review. (`access-manager` and
+  `create-repo` are steps the orchestrator performs itself, not agents; they
+  are recorded under those keys all the same.) If the orchestrator ran any
+  further step, create-repo included, its record must be present and
+  approved too. A missing
   agent is not an implicit pass - it is a failed verification. The required
   list is the same every single time: you never shorten it because the app
   has been sent before, and you never lengthen it because you think this
@@ -84,8 +87,8 @@ happening and go back to the deploying-your-app chain to re-run what is needed:
 > "The app changed after some of the checks ran, so those checks no longer
 > describe what would be sent. I'm re-running them now - nothing is lost."
 
-You never mark an agent approved on their behalf: a missing or stale check
-is re-run as an agent through the chain, never done by hand here.
+You never mark a step approved on its behalf: a missing or stale check
+is re-run through the chain by the orchestrator, never done by hand here.
 
 ## Step 2 - confirm the deployment details are complete for IT
 

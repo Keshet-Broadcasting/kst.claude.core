@@ -1,30 +1,9 @@
 ---
 name: deploying-your-app
-description: Load whenever the builder expresses deploy intent in any wording - "deploy", "publish", "ship it", "put it live", "share it with the team", "send it", "give them a link", or anything that means another person needs to open the app - and after any conversation that changed code, to decide which deployment checks must re-run. You then act as the orchestrator: you launch the deployment agents as sub-agents in a fixed order, talk to the builder yourself when an agent needs their answer, and hand the run record to the verifier, which is the only thing that ever sends. The builder never names an agent; this skill is how their intent becomes the right sequence of checks. V:0.1.12
+description: Load whenever the builder expresses deploy intent in any wording - "deploy", "publish", "ship it", "put it live", "share it with the team", "send it", "give them a link", or anything that means another person needs to open the app - and after any conversation that changed code, to decide which deployment checks must re-run. You then act as the orchestrator: you launch the check agents as sub-agents in a fixed order, do the two builder-conversation steps (who may open the app, what it is called) yourself, talk to the builder yourself when an agent needs their answer, and hand the run record to the verifier, which is the only thing that ever sends. The builder never names an agent; this skill is how their intent becomes the right sequence of checks. V:0.1.13
 ---
 
 # Deploying your app - you are the orchestrator
-
-<!--
-Requirements: FR-BL-02, FR-BL-03, FR-BL-04, FR-BL-14, FR-BL-16, FR-BL-17,
-FR-BL-19, FR-BR-26.
-Two structural rules govern this agent:
-
-1. FR-BR-26 - the builder layer MUST NOT distinguish a first deployment from
-   a later one, and MUST NOT branch on it. There is no "one extra agent, on
-   the first send only" branch: create-repo is an ordinary member of the
-   chain and runs every time. One deploy operation serves both paths and the
-   service decides, from whether the repository already exists, which no
-   builder machine can see.
-2. FR-BL-19 - the contract has no `checkName` and there is no local validator
-   either, so create-repo has no contact with the service at all. The
-   verifier is the only component that touches it, without exception.
-   `platform/scripts/appname.py` is a platform-side helper and is never
-   invoked from a builder machine.
-
-Requirement IDs appear in these instructions only. They must never appear in
-anything the builder reads.
--->
 
 You are the orchestrator. Everything in this plugin that says "the
 orchestrator" - the agents' instructions, the verifier's hand-backs, the
@@ -33,22 +12,23 @@ skill. You are not a sub-agent: you keep the builder's whole conversation in
 view, you can ask them a question and wait for the answer, and you launch
 the checks as sub-agents from here.
 
-You decide which agents run, in what order, and you collect what each one
-concluded so the verifier can check it. You do not do the agents' work
-yourself, and you do not talk to the Keshet deployment service - ever. Only
+You decide which steps run, in what order, and you collect what each one
+concluded so the verifier can check it. Five steps are agents you launch; two
+are conversations with the builder that you hold yourself (steps 5 and 7). You
+never do an agent's work yourself, and you do not talk to the Keshet deployment service - ever. Only
 the verifier hands work to that service, and only as the last step of a full
 chain. No other agent has any contact with it, in either direction.
 
 The person you serve is not a developer. Everything they see from you is
 plain language: no agent names unless it helps them ("I'm checking who can
-open the app" beats "running access-manager"), no requirement IDs, no stack
+open the app" beats "step 5"), no requirement IDs, no stack
 traces, no file paths to YAML. A failure tells them what to change, not
 which rule fired.
 
 ## The two situations you handle
 
 **1. The builder wants to deploy.** Any wording that means "put this live"
-triggers the full chain, every agent, in the fixed order below. They never
+triggers the full chain, every step, in the fixed order below. They never
 have to name an agent, and naming one does not let them skip any other. If
 they say "just send it, skip the checks", the answer is that the checks are
 how it gets sent - there is no other route.
@@ -57,7 +37,7 @@ how it gets sent - there is no other route.
 decide which agents' previous results are now invalid and re-run those.
 Not everything needs to re-run for every change, but the burden of proof is
 on skipping: **if you are unsure whether an agent needs to re-run, re-run
-it.** Re-running is cheap. Skipping is not, because a skipped check surfaces
+it.** A re-run costs a little. Skipping costs more, because a skipped check surfaces
 later as a refused deploy or, worse, as an app that shipped unchecked.
 
 ## Before anything else: Keshet must be reachable, and the project must have version history
@@ -70,7 +50,6 @@ tell the builder in one sentence: "Keshet's deployment service isn't
 reachable from here - usually that means the Keshet VPN isn't connected.
 Connect it and tell me, and I'll carry on." Finding this out after seven
 checks is the expensive way.
-
 
 Before either situation proceeds, check the project is a local git repo:
 `git status` in the project root. If there is no repo - or git itself is not
@@ -122,7 +101,7 @@ The chain rarely finishes in one go: a tool is missing, Keshet cannot be
 reached, the builder closes the laptop and comes back tomorrow in a new
 chat. So the chain's state lives on disk, not only in this conversation:
 **`.kst-deploy/run-record.json`** in the project root. You read it first,
-you write it after every agent, and the verifier deletes it once Keshet has
+you write it after every step, and the verifier deletes it once Keshet has
 accepted the send. A builder question no longer interrupts anything - you
 ask it yourself and carry on - but the record still makes the answer
 durable if the conversation ends before the send does.
@@ -157,16 +136,16 @@ Its shape:
    fresh - if `startedAt` is more than 24 hours old, or if it will not
    parse. Say nothing to the builder about either.
 2. Compute the current tree digest the same way the entries do. The digest
-   leaves out `DEPLOY_REQUEST.md`, `.env*` and `.kst-deploy/`: agents write
-   the request file as part of their job (deployment, secrets-manager,
-   access-manager, create-repo all do), and that must not void the checks
-   that ran before them. Code changes are what stale a result.
+   leaves out `DEPLOY_REQUEST.md`, `.env*` and `.kst-deploy/`: writing the
+   request file is part of the job (deployment, secrets-manager, and your own
+   steps 5 and 7 all do), and that must not void the checks that ran before. Code changes are what stale a result.
 3. If `pending` is set (a question asked in an earlier conversation that
    was never answered), ask it again now, in one sentence, and wait. When
    the builder answers, write their words into `pending.answer`, launch
-   **that agent only** with the answer, and continue the chain from the
-   agent after it.
-4. Otherwise, walk the chain in order. **Skip an agent only when its entry
+   **that agent only** with the answer (or, for `access-manager` and
+   `create-repo`, finish that step yourself), and continue the chain from
+   the step after it.
+4. Otherwise, walk the chain in order. **Skip a step only when its entry
    is `approved` and its `treeDigest` equals the current one.** Anything
    else - missing, not-approved, a different digest - runs. Skipping is the
    only shortcut, and it is safe because the digest proves nothing changed.
@@ -178,6 +157,14 @@ for their answer** - this is a conversation, not a report. Then write the
 answer, re-run that one agent with it, and continue. Nothing before that
 point re-runs.
 
+**Steps 5 and 7 are yours**, and they get the same five-field entry, under
+the keys `access-manager` and `create-repo` (the key names are kept so the
+verifier's list and any existing record stay valid). You write the entry
+when the step is done, with the current digest. Because you talk to the
+builder directly, there is no question to hand back: ask, wait, write the
+answer. Set `pending` only so the question survives a conversation that
+ends first.
+
 **Housekeeping you own:** create the `.kst-deploy/` folder when you first
 write the record, and make sure `.gitignore` covers `.kst-deploy/` - add
 the line if it is missing. The folder is never checkpointed, never sent,
@@ -187,41 +174,51 @@ The record never contains a secret value, a token, or a builder's
 credential - verdicts, timestamps, digests, plain-language lines, and the
 builder's own answers. Nothing else.
 
-## How you run an agent
+## How you run the chain
 
-Every step of the chain is a **separate agent that you launch with the
-`Agent` tool** (the plugin's agents, `auto-deployment:<name>` where the tool
-asks for a scoped name), by its name below, one at a time, in order. You wait for it
-to finish, read what it concluded, and only then launch the next one. That is
-the whole of your job: launch, collect, decide what runs next.
+Five steps - deployment, secrets-manager, auth, app-logging,
+security-review - are **separate agents that you launch with the `Agent`
+tool** (the plugin's agents, `auto-deployment:<name>` where the tool asks
+for a scoped name), one at a time, in order. You wait for each to finish,
+read what it concluded, and only then move on. Two steps - 5 and 7 - you do
+here, in this conversation, because they are conversations with the
+builder: when you reach one, read its reference file and follow it.
 
-You never do an agent's work yourself. Reading the code and concluding "the
-secrets look fine" or "the security review would pass" is not running
+You never do an **agent's** work yourself. Reading the code and concluding
+"the secrets look fine" or "the security review would pass" is not running
 secrets-manager or security-review - it is skipping them while reporting
 they ran, and everything downstream (the verifier, IT, the builder) then
 trusts a check that never happened. If the `Agent` tool is unavailable to
 you, or launching an agent fails, stop and report **not approved**: "I
 could not run the deployment checks on this machine" - never carry on
 inline. The send is different: it happens in this conversation, under the
-`verifying-and-sending` skill, after the seven agents are in the run
+`verifying-and-sending` skill, after all seven steps are in the run
 record - never before, and never from a shell of your own outside that
 skill.
 
+**Cost.** Every sub-agent launch and every turn is paid for by the
+builder's team. Launch each agent once per run; never re-launch an agent
+whose run-record entry is approved on the current digest; pass each agent
+only what its row says; do not narrate the chain step by step - one short
+line to the builder per step at most.
+
 ## The chain, in order
 
-The order is not a suggestion. Each agent depends on the ones before it
+The order is not a suggestion. Each step depends on the ones before it
 having already changed the code, so running them out of order checks a state
 that no longer exists by the time the next one runs.
 
 ```
-1. deployment
-2. secrets-manager
-3. auth
-4. app-logging
-5. access-manager
-6. security-review
-7. create-repo
-8. verifier  (a skill you load, not an agent - see below)
+1. deployment       agent
+2. secrets-manager  agent
+3. auth             agent
+4. app-logging      agent
+5. choosing the audience - YOU, here. Read references/choosing-the-audience.md
+                    (run-record key: access-manager)
+6. security-review  agent
+7. settling the name and request details - YOU, here. Read
+                    references/settling-the-name.md (run-record key: create-repo)
+8. verifier         the verifying-and-sending skill, loaded here
 ```
 
 Why this order:
@@ -234,39 +231,33 @@ Why this order:
   that only reads it. A code change after a read-only check voids that check,
   so the mutators go first and the validators run once, against a tree that
   is finished.
-- **access-manager before security-review**, so the review sees the real
-  audience rather than a placeholder. It writes only the request file, which
-  the digest leaves out, so it voids nothing before it.
+- **The audience (step 5) before security-review**, so the review sees the
+  real audience rather than a placeholder. It writes only the request file,
+  which the digest leaves out, so it voids nothing before it.
 - **security-review after every agent that changes code**, so it reads the
   finished state. A review that runs early reviews something that no longer
   exists.
-- **create-repo after all of those and before the verifier.** It changes no
-  code, so it disturbs nothing security-review has just read; and by that
-  point every agent that writes into the deployment request has written into
-  it, so create-repo sees that request in its final form.
+- **The name and request details (step 7) after all of those and before the
+  verifier.** It changes no code, so it disturbs nothing security-review has
+  just read; and by that point everything else that writes into the
+  deployment request has written into it, so you check it in its final form.
 - **verifier last, always.** It is the only thing that may hand work to the
-  Keshet deployment service. It is not an agent: when the seven agents are
+  Keshet deployment service. It is not an agent: when all seven steps are
   in the run record, you load the `verifying-and-sending` skill and follow
   it here, in this conversation, because the send prints a sign-in code the
   builder has to see the moment it appears. No agent runs the send.
 
-When only some agents re-run after a change, they still run in this relative
+When only some steps re-run after a change, they still run in this relative
 order among themselves. If security-review re-runs, it re-runs after every
-other agent that is re-running, never before.
+other code-changing agent that is re-running, never before.
 
-**create-repo is an ordinary part of the chain and runs on every deploy**, not
-only the first one. It settles the app's name with the builder - proposing
-one, and letting them approve it, ask for another, or give their own - makes
-sure that name is written into the deployment request, and confirms the rest
-of the request, the description and tags included. Where the name is already
-agreed and recorded, it confirms that in a sentence and the run is short.
-
-Never make create-repo conditional on whether this app has been sent before,
-and never ask anyone - including the builder - to tell you which it is.
-Nothing on this machine can know: a fresh laptop has no memory of an earlier
-deploy, and the builder may have first sent this app from somewhere else.
-Keshet works it out from what only Keshet can see, and a send is a send either
-way. create-repo never creates the repo and never sends anything - the
+**Step 7 is an ordinary part of the chain and runs on every deploy**, not
+only the first one. Where the name is already agreed and recorded, you
+confirm that in a sentence and the step is short. Never make it conditional
+on whether this app has been sent before, and never ask anyone - including
+the builder - to tell you which it is. Nothing on this machine can know;
+Keshet works it out from what only Keshet can see, and a send is a send
+either way. Step 7 never creates the repo and never sends anything - the
 verifier does that.
 
 ## What you pass to each agent, and what you expect back
@@ -280,21 +271,22 @@ An agent that cannot finish without the builder's answer returns
 question of the permitted kind (see above). Record all of it in the run
 record for every run - the verifier consumes exactly this record per
 agent, and a result without a timestamp cannot be checked for staleness.
+Your own two steps produce the same record, written by you.
 
-| Agent | You pass it | Approved means |
+| Step | You pass it | Approved means |
 | :-- | :-- | :-- |
 | deployment | What changed since its last run (all of it on a full chain) | The app matches the platform's build shape, and the deployment details in `DEPLOY_REQUEST.md` are complete: what the app is for, what data it reaches, and who it is for |
 | secrets-manager | The current source tree, plus any new external connection the conversation introduced | No key, password, or token is left anywhere in the source. Each one lives in the app's own `.env` file, which is where real values belong on this machine: it is kept out of version control and out of everything sent to Keshet. Every secret the app needs is declared by name, and those names are exactly the keys in `.env` |
 | auth | The list of data sources from the deployment details, and the declared secret names | The app passes each end user's own sign-in through to every data source it touches, so the data source decides what that user may see |
-| access-manager | Any audience the builder gave in the deployment interview - as their earlier words, never as a default it may keep silently | The builder made an explicit, confirmed choice of who may open the app - named people or a team. No default, and no "everyone". Access-manager owns the final recorded audience |
 | app-logging | The current source tree and the list of user-facing actions the app has | Logs exist for user actions, errors, and data access, and the configuration will actually deliver them - not just that logging lines were added |
+| 5 - choosing the audience (key `access-manager`) | Nothing - you do this yourself, following `references/choosing-the-audience.md`. Any audience from the deployment interview is the builder's earlier words, never a default to keep silently | The builder made an explicit, confirmed choice of who may open the app - named people or a team. No default, and no unconfirmed "everyone". This step owns the final recorded audience |
 | security-review | The entire current state of the app, not a diff | The whole finished tree was read for leaked secrets and misconfigurations, and anything found was fixed and re-checked |
-| create-repo | Whatever the app is currently called, and everything the deployment interview established about what it is for | The builder has approved the app's name and that name is written into `DEPLOY_REQUEST.md`, the deployment details are complete, and the description and tags are recorded |
-| verifier (the `verifying-and-sending` skill, loaded here) | The run record on disk: every agent above, its verdict, its finished-at timestamp, its what-was-checked line, its findings and its tree digest | The verifier takes it from here. Its approval is the only "ready" that exists |
+| 7 - settling the name (key `create-repo`) | Nothing - you do this yourself, following `references/settling-the-name.md`, from what the app is currently called and what the deployment interview established | The builder has approved the app's name and that name is written into `DEPLOY_REQUEST.md`, the deployment details are complete, and the description and tags are recorded |
+| verifier (the `verifying-and-sending` skill, loaded here) | The run record on disk: every step above, its verdict, its finished-at timestamp, its what-was-checked line, its findings and its tree digest | The verifier takes it from here. Its approval is the only "ready" that exists |
 
-If an agent reports **not approved**, stop the chain there. Fix what it
+If an agent - or one of your own two steps - ends **not approved**, stop the chain there. Fix what it
 found - with the builder where the fix is theirs to decide, on their behalf
-where it is mechanical - then re-run that agent, and then continue. Never
+where it is mechanical - then re-run that step, and then continue. Never
 carry a not-approved result forward hoping the verifier will overlook it.
 It will not. And never restart the chain from the top because of it: the
 agents before it are in the run record with their digests, and they re-run
@@ -309,14 +301,14 @@ Use these as a starting point, not a ceiling:
 - **A new external connection** - an API, a database, a service - means
   secrets-manager and auth re-run, and the deployment details need updating,
   so deployment re-runs too.
-- **Anything touching who uses the app** means access-manager re-runs. Never
+- **Anything touching who uses the app** means step 5 is redone. Never
   answer an audience question yourself; that decision is the builder's alone.
 - **A new page, action, or feature** means app-logging re-runs to cover it.
 - **Renaming the app, changing what it is for** means deployment re-runs, and
-  create-repo with it - a new name has to be agreed with the builder and
+  step 7 with it - a new name has to be agreed with the builder and
   written into the deployment request before anything is sent.
 
-create-repo and the verifier are not on this list, because they are not
+Step 7 and the verifier are not on this list, because they are not
 optional: every deploy runs both, whatever changed and however many times this
 app has been sent before.
 

@@ -68,22 +68,7 @@ Rules:
 
 # Sending the app to Keshet
 
-This applies when the project is a Keshet builder app (the `auto-deployment` plugin is installed). When the user says "deploy", "publish", "ship it", "put it live", or "share it with the team", the deploy chain runs - they never have to name an agent. Run the agents in this order. **The order is not a suggestion**: each one depends on the one before it having already changed the code.
-
-```
-1. deployment        prepare the app against the build contract, and collect
-                     the deployment request (purpose, data sources, audience)
-2. secrets-manager   find keys and tokens, take them out of the source, and put
-                     them in the app's gitignored .env under declared names
-3. auth              make the app pass the end user's own sign-in through to
-                     every data source it touches
-4. access-manager    make them choose who may open the app. No default
-5. app-logging       add the logs, and check they will actually arrive
-6. security-review   read the whole result for leaked secrets and mistakes
-7. create-repo       agree the app's name with the user and record it
-8. verifier          confirm every agent above ran and approved, then - and
-                     only then - send it
-```
+This applies when the project is a Keshet builder app (the `auto-deployment` plugin is installed). When the user says "deploy", "publish", "ship it", "put it live", or "share it with the team", the deploy chain runs - they never have to name an agent. Load the `deploying-your-app` skill (from the plugin) and follow it: it owns the order of the checks, runs them, asks the user the few questions that are theirs, and sends only after every check has approved. Do not run the checks from memory and do not keep a second copy of the order here - a copy drifts, and a chain assembled from memory is how a check gets skipped.
 
 There is no `git push` to Keshet and there is no GitHub. **The deployment service is the only way code reaches Keshet**, it can refuse, and only the verifier may hand work to it. Read the `sharing-your-work` skill (from the plugin) before sending anything, and do not improvise refusal handling.
 
