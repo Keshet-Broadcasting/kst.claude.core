@@ -277,6 +277,49 @@ const STAMPED_FIELDS = [
   }
 }
 
+// The app spec - .kst/app-spec.md - is the description of the app that
+// Keshet's assessment compares every later change against. The deployment
+// agent writes it; here it only has to exist, in the template's shape, with
+// every section answered. Keshet's side reads it far more closely (it fails
+// a spec that contradicts the code), so a send without one, or with a
+// placeholder in it, is refused before anything leaves the machine.
+const SPEC_PATH = join('.kst', 'app-spec.md');
+const SPEC_HEADINGS = [
+  '## What the app does',
+  '## Who uses it',
+  '## Data it reads and writes',
+  '## Systems it connects to',
+  '## How people sign in',
+];
+{
+  const specFile = join(appDir, SPEC_PATH);
+  if (!existsSync(specFile)) {
+    fail(EXIT_LOCAL,
+      'The app spec (.kst/app-spec.md) is missing, so nothing was sent. The deployment agent writes it from the app spec template; the deploy chain needs re-running so it exists before the app can go to Keshet.');
+  }
+  const spec = readFileSync(specFile, 'utf8');
+  if (spec.includes('CHANGE-ME')) {
+    fail(EXIT_LOCAL,
+      'The app spec (.kst/app-spec.md) still has a CHANGE-ME placeholder in it, so nothing was sent. Every section needs a real answer before the app can go to Keshet.');
+  }
+  const specLines = spec.split('\n');
+  const missing = SPEC_HEADINGS.filter((h) => !specLines.some((l) => l.trim() === h));
+  if (missing.length > 0) {
+    fail(EXIT_LOCAL,
+      `The app spec (.kst/app-spec.md) is missing the section${missing.length > 1 ? 's' : ''} ${missing.map((h) => `"${h.slice(3)}"`).join(', ')}, so nothing was sent. It must keep the five sections of the app spec template, with those exact headings.`);
+  }
+  const empty = SPEC_HEADINGS.filter((h) => {
+    const start = specLines.findIndex((l) => l.trim() === h);
+    const body = [];
+    for (let i = start + 1; i < specLines.length && !specLines[i].startsWith('## '); i += 1) body.push(specLines[i]);
+    return body.join('\n').trim() === '';
+  });
+  if (empty.length > 0) {
+    fail(EXIT_LOCAL,
+      `The app spec (.kst/app-spec.md) has nothing under ${empty.map((h) => `"${h.slice(3)}"`).join(', ')}, so nothing was sent. Every section needs a real answer before the app can go to Keshet.`);
+  }
+}
+
 // The IT review form asks for the audience and the kind of information the
 // app handles; both are answered from the request file, in words a reviewer
 // can judge. Apps on this platform are only ever opened by the named Keshet

@@ -81,6 +81,10 @@ anything the builder reads.
 <!--
 ===========================================================================
 Requirements: FR-BL-06 (build contract), FR-BL-07 (the deployment request),
+FR-VS-04 (the app spec `.kst/app-spec.md` - written by this agent, read by the
+platform's Assess stage at the last deployed commit and compared against the
+new code; a spec that contradicts the code fails the run, and a spec change in
+the diff is itself major),
 with FR-BL-16 (fail closed) and FR-BL-17 (plain language) applied
 throughout. Naming follows FR-BL-19. Secret names are FR-BL-13 / FR-SK-12;
 the Requester stamp is FR-BR-07 and is read as the ownership record by

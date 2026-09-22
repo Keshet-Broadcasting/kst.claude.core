@@ -14,6 +14,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 const SCRIPT = join(__dirname, 'send-deploy.mjs');
 const TEMPLATE = join(__dirname, '..', 'templates', 'DEPLOY_REQUEST.md');
+const SPEC_TEMPLATE = join(__dirname, '..', 'templates', 'app-spec.md');
 
 const EXIT_LOCAL = 1;
 const EXIT_REFUSED = 2;
@@ -63,10 +64,29 @@ const withoutLines = (text: string, names: string[]): string =>
     .filter((line) => !names.some((name) => line.startsWith(`${name}:`)))
     .join('\n');
 
-const runSend = (request: string, baseUrl = 'http://127.0.0.1:9') => {
+// The app spec the deployment agent writes. The spec headings are the
+// contract Keshet's assessment checks, so the filled copy here is the
+// template with every CHANGE-ME answered and nothing else touched.
+const SPEC_HEADINGS = [
+  '## What the app does',
+  '## Who uses it',
+  '## Data it reads and writes',
+  '## Systems it connects to',
+  '## How people sign in',
+];
+const specTemplate = (): string => readFileSync(SPEC_TEMPLATE, 'utf8');
+const filledSpec = (): string => specTemplate()
+  .replace(/^# App spec: CHANGE-ME$/m, '# App spec: probe-app')
+  .replace(/^CHANGE-ME$/mg, 'A probe, described.');
+
+const runSend = (request: string, baseUrl = 'http://127.0.0.1:9', spec: string | null = filledSpec()) => {
   const dir = mkdtempSync(join(tmpdir(), 'send-deploy-test-'));
   writeFileSync(join(dir, 'DEPLOY_REQUEST.md'), request);
   writeFileSync(join(dir, 'package.json'), '{}');
+  if (spec !== null) {
+    mkdirSync(join(dir, '.kst'), { recursive: true });
+    writeFileSync(join(dir, '.kst', 'app-spec.md'), spec);
+  }
   const result = spawnSync(process.execPath, [SCRIPT, dir], {
     encoding: 'utf8',
     env: { ...process.env, KST_AUTH_API_BASE_URL: baseUrl },
@@ -82,6 +102,8 @@ const runSendAsync = async (request: string, baseUrl: string) => {
   const dir = mkdtempSync(join(tmpdir(), 'send-deploy-test-'));
   writeFileSync(join(dir, 'DEPLOY_REQUEST.md'), request);
   writeFileSync(join(dir, 'package.json'), '{}');
+  mkdirSync(join(dir, '.kst'), { recursive: true });
+  writeFileSync(join(dir, '.kst', 'app-spec.md'), filledSpec());
   const child = spawn(process.execPath, [SCRIPT, dir], {
     env: { ...process.env, KST_AUTH_API_BASE_URL: baseUrl },
   });
@@ -133,6 +155,58 @@ describe('templates/DEPLOY_REQUEST.md', () => {
     expect(text).toContain('requested-by-object-id: STAMPED-BY-BROKER');
     expect(text).toContain('broker-verified-at: STAMPED-BY-BROKER');
     expect(text).toContain('verifier-signoff: pending');
+  });
+});
+
+describe('templates/app-spec.md', () => {
+  it('carries exactly the five headings the assessment checks, in order', () => {
+    const headings = specTemplate().split('\n').filter((l) => l.startsWith('## '));
+    expect(headings).toEqual(SPEC_HEADINGS);
+  });
+});
+
+describe('send-deploy.mjs app spec checks', () => {
+  const dirs: string[] = [];
+  afterEach(() => {
+    for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('refuses a send with no .kst/app-spec.md', () => {
+    const run = runSend(filledTemplate(), undefined, null);
+    dirs.push(run.dir);
+    expect(run.status).toBe(EXIT_LOCAL);
+    expect(run.stdout).toContain('.kst/app-spec.md');
+    expect(run.stdout).toContain('nothing was sent');
+  });
+
+  it('refuses the unfilled spec template', () => {
+    const run = runSend(filledTemplate(), undefined, specTemplate());
+    dirs.push(run.dir);
+    expect(run.status).toBe(EXIT_LOCAL);
+    expect(run.stdout).toContain('CHANGE-ME');
+  });
+
+  for (const heading of SPEC_HEADINGS) {
+    it(`refuses a spec missing the section "${heading.slice(3)}"`, () => {
+      const run = runSend(filledTemplate(), undefined, filledSpec().replace(`${heading}\n`, '## Something else\n'));
+      dirs.push(run.dir);
+      expect(run.status).toBe(EXIT_LOCAL);
+      expect(run.stdout).toContain(heading.slice(3));
+    });
+  }
+
+  it('refuses a spec whose section is empty', () => {
+    const empty = filledSpec().replace('## Who uses it\n\nA probe, described.\n', '## Who uses it\n\n');
+    const run = runSend(filledTemplate(), undefined, empty);
+    dirs.push(run.dir);
+    expect(run.status).toBe(EXIT_LOCAL);
+    expect(run.stdout).toContain('Who uses it');
+  });
+
+  it('passes the spec checks when the spec is filled (fails later, on the network)', () => {
+    const run = runSend(filledTemplate());
+    dirs.push(run.dir);
+    expect(run.stdout).not.toContain('app-spec');
   });
 });
 
@@ -193,12 +267,14 @@ describe('send-deploy.mjs local checks', () => {
     const dir = mkdtempSync(join(tmpdir(), 'send-deploy-test-'));
     dirs.push(dir);
     writeFileSync(join(dir, 'DEPLOY_REQUEST.md'), filledTemplate());
+    mkdirSync(join(dir, '.kst'), { recursive: true });
+    writeFileSync(join(dir, '.kst', 'app-spec.md'), filledSpec());
     writeFileSync(join(dir, 'package.json'), '{}');
     mkdirSync(join(dir, '.kst-deploy'));
     writeFileSync(join(dir, '.kst-deploy', 'run-record.json'), '{"agents":[]}');
     const result = spawnSync(process.execPath, [SCRIPT, dir], {
       encoding: 'utf8',
-      env: { ...process.env, KST_AUTH_API_BASE_URL: 'http://127.0.0.1:9', KST_DEPLOY_MAX_FILES: '2' },
+      env: { ...process.env, KST_AUTH_API_BASE_URL: 'http://127.0.0.1:9', KST_DEPLOY_MAX_FILES: '3' },
       timeout: 30_000,
     });
     expect(result.status).toBe(EXIT_UNREACHABLE);
@@ -381,6 +457,8 @@ describe('send-deploy.mjs check mode, sign-in cache, and 413', () => {
     const dir = mkdtempSync(join(tmpdir(), 'send-deploy-test-'));
     dirs.push(dir);
     writeFileSync(join(dir, 'DEPLOY_REQUEST.md'), filledTemplate());
+    mkdirSync(join(dir, '.kst'), { recursive: true });
+    writeFileSync(join(dir, '.kst', 'app-spec.md'), filledSpec());
     writeFileSync(join(dir, 'package.json'), '{}');
     const cache = join(dir, 'cache');
     const first = await runWith(dir, baseUrl, cache);
@@ -398,6 +476,8 @@ describe('send-deploy.mjs check mode, sign-in cache, and 413', () => {
     const dir = mkdtempSync(join(tmpdir(), 'send-deploy-test-'));
     dirs.push(dir);
     writeFileSync(join(dir, 'DEPLOY_REQUEST.md'), filledTemplate());
+    mkdirSync(join(dir, '.kst'), { recursive: true });
+    writeFileSync(join(dir, '.kst', 'app-spec.md'), filledSpec());
     writeFileSync(join(dir, 'package.json'), '{}');
     const run = await runWith(dir, baseUrl, join(dir, 'cache'));
     expect(run.status).toBe(EXIT_REFUSED);

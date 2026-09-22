@@ -1,6 +1,6 @@
 ---
 name: deploying-your-app
-description: Load whenever the builder expresses deploy intent in any wording - "deploy", "publish", "ship it", "put it live", "share it with the team", "send it", "give them a link", or anything that means another person needs to open the app - and after any conversation that changed code, to decide which deployment checks must re-run. You then act as the orchestrator: you launch the check agents as sub-agents in a fixed order, do the two builder-conversation steps (who may open the app, what it is called) yourself, talk to the builder yourself when an agent needs their answer, and hand the run record to the verifier, which is the only thing that ever sends. The builder never names an agent; this skill is how their intent becomes the right sequence of checks. V:0.1.13
+description: Load whenever the builder expresses deploy intent in any wording - "deploy", "publish", "ship it", "put it live", "share it with the team", "send it", "give them a link", or anything that means another person needs to open the app - and after any conversation that changed code, to decide which deployment checks must re-run. You then act as the orchestrator: you launch the check agents as sub-agents in a fixed order, do the two builder-conversation steps (who may open the app, what it is called) yourself, talk to the builder yourself when an agent needs their answer, and hand the run record to the verifier, which is the only thing that ever sends. The builder never names an agent; this skill is how their intent becomes the right sequence of checks. V:0.1.14
 ---
 
 # Deploying your app - you are the orchestrator
@@ -275,7 +275,7 @@ Your own two steps produce the same record, written by you.
 
 | Step | You pass it | Approved means |
 | :-- | :-- | :-- |
-| deployment | What changed since its last run (all of it on a full chain) | The app matches the platform's build shape, and the deployment details in `DEPLOY_REQUEST.md` are complete: what the app is for, what data it reaches, and who it is for |
+| deployment | What changed since its last run (all of it on a full chain) | The app matches the platform's build shape, the deployment details in `DEPLOY_REQUEST.md` are complete: what the app is for, what data it reaches, and who it is for - and the app spec in `.kst/app-spec.md` describes the code as it is now, updated on this send only if what the app does changed |
 | secrets-manager | The current source tree, plus any new external connection the conversation introduced | No key, password, or token is left anywhere in the source. Each one lives in the app's own `.env` file, which is where real values belong on this machine: it is kept out of version control and out of everything sent to Keshet. Every secret the app needs is declared by name, and those names are exactly the keys in `.env` |
 | auth | The list of data sources from the deployment details, and the declared secret names | The app passes each end user's own sign-in through to every data source it touches, so the data source decides what that user may see |
 | app-logging | The current source tree and the list of user-facing actions the app has | Logs exist for user actions, errors, and data access, and the configuration will actually deliver them - not just that logging lines were added |
@@ -304,6 +304,10 @@ Use these as a starting point, not a ceiling:
 - **Anything touching who uses the app** means step 5 is redone. Never
   answer an audience question yourself; that decision is the builder's alone.
 - **A new page, action, or feature** means app-logging re-runs to cover it.
+- **Anything that changes what the app does** - new data, a new system, a
+  read that became a write, a change to sign-in - means deployment re-runs so
+  the app spec says so. Keshet's side refuses a send whose spec and code
+  disagree, and a spec left stale is the commonest way to earn that refusal.
 - **Renaming the app, changing what it is for** means deployment re-runs, and
   step 7 with it - a new name has to be agreed with the builder and
   written into the deployment request before anything is sent.
