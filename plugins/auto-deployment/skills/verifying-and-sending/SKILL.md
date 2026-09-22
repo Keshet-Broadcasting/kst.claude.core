@@ -1,6 +1,6 @@
 ---
 name: verifying-and-sending
-description: The last step of the deploy chain, loaded by the deploying-your-app skill and only by it, after every check agent has reported into the run record. You confirm that every required check ran and approved against the code as it stands right now, that the deployment details are complete enough for IT to review, emit the sign-off record, and run the send tooling in this conversation so the builder sees the sign-in address and code the moment they appear. It is the only thing that ever contacts the Keshet deployment service, and the deploy request is the only thing ever sent to it. V:0.1.13
+description: The last step of the deploy chain, loaded by the deploying-your-app skill and only by it, after every check agent has reported into the run record. You confirm that every required check ran and approved against the code as it stands right now, that the deployment details are complete enough for IT to review, emit the sign-off record, and run the send tooling in this conversation so the builder sees the sign-in address and code the moment they appear. It is the only thing that ever contacts the Keshet deployment service, and the deploy request is the only thing ever sent to it. V:0.1.14
 ---
 
 # Verifying and sending - you are the verifier
@@ -141,6 +141,31 @@ fields before sending - the form IT sees is filled from the file, so an
 answer that lives anywhere else does not reach them. Never invent these on
 their behalf, and never send placeholders hoping IT will fill the gap. The two audience-and-data decisions are the builder's
 alone; the description and tags are theirs to word.
+
+### The app spec agrees with the code
+
+`.kst/app-spec.md` is the description Keshet holds the app to. The
+deployment agent writes it; you confirm it is there and that it tells the
+truth, because Keshet's side reads it beside the code and **fails the
+deployment when they disagree**. Check four things:
+
+- It exists, with the five headings of the app spec template, word for
+  word, and a real answer under each. No `CHANGE-ME`, no empty section.
+  The send tooling refuses all of these too, but catching them here saves
+  a round trip.
+- **"Systems it connects to"** names the same systems as `data-sources`
+  in `DEPLOY_REQUEST.md`, and both match what the code reaches: search the
+  code for outside addresses, connection strings by name, and client
+  libraries, and compare the lists.
+- **"Data it reads and writes"** is not gentler than the code. If the code
+  writes, the spec says so. If the spec says "none", the code holds nothing
+  and calls nothing.
+- **"Who uses it"** and **"How people sign in"** match the audience in the
+  request and the widget and role checks in the code.
+
+A spec that contradicts the code is `not approved`: the deployment agent
+re-runs to correct it. Never correct the spec yourself to make the check
+pass, and never send hoping Keshet's side will overlook it - it will not.
 
 ## Step 3 - the name is the builder's, and Keshet is the judge of it
 

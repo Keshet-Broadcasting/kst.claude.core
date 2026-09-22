@@ -229,6 +229,43 @@ if command -v node >/dev/null 2>&1; then
   fi
 fi
 
+# The app spec template. Its five headings are the contract the platform's
+# Assess stage checks (platform/scripts/assess/classify.py SPEC_SECTIONS), so
+# the template must carry exactly those, in that order, and the send tooling
+# must refuse a send that has no spec at all.
+SPEC_TEMPLATE="${PLUGIN_DIR}/templates/app-spec.md"
+if [[ -f "$SPEC_TEMPLATE" ]]; then
+  pass "templates/app-spec.md ships with the plugin"
+  EXPECTED_HEADINGS=$'## What the app does\n## Who uses it\n## Data it reads and writes\n## Systems it connects to\n## How people sign in'
+  if [[ "$(grep '^## ' "$SPEC_TEMPLATE")" == "$EXPECTED_HEADINGS" ]]; then
+    pass "app-spec template carries the five assessed headings, in order"
+  else
+    fail "app-spec template headings differ from the five the platform assesses"
+  fi
+  if [[ -n "${SEND_MJS:-}" && -f "$SEND_MJS" ]]; then
+    PROBE_DIR="$(mktemp -d)"
+    sed -e 's/^app-name: CHANGE-ME/app-name: probe-app/' \
+        -e 's/^purpose: CHANGE-ME/purpose: probe/' \
+        -e 's/^description: CHANGE-ME/description: probe/' \
+        -e 's/^tags: CHANGE-ME/tags: probe/' \
+        -e 's/^data-sources: CHANGE-ME/data-sources: none/' \
+        -e 's/^audience-type: CHANGE-ME/audience-type: individuals/' \
+        -e 's/^audience-members: CHANGE-ME/audience-members: probe@example.com/' \
+        "${PLUGIN_DIR}/templates/DEPLOY_REQUEST.md" > "${PROBE_DIR}/DEPLOY_REQUEST.md"
+    echo '{}' > "${PROBE_DIR}/package.json"
+    out="$(node "$SEND_MJS" "$PROBE_DIR" 2>&1)"
+    rc=$?
+    if [[ $rc -eq 1 ]] && grep -q 'app-spec.md' <<<"$out"; then
+      pass "send without .kst/app-spec.md exits 1 and names the file"
+    else
+      fail "send without .kst/app-spec.md: exit ${rc}, output: ${out:-<none>}"
+    fi
+    rm -rf "$PROBE_DIR"
+  fi
+else
+  fail "templates/app-spec.md is missing from the plugin"
+fi
+
 if grep -q 'itccId' "$SEND_MJS" && grep -q 'ITCC case:' "$SEND_MJS"; then
   pass "send-deploy.mjs reads itccId and prints 'ITCC case:'"
 else

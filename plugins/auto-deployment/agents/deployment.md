@@ -266,11 +266,84 @@ If anything changes later - a new data source, a different audience - this
 file must change with it, and the chain re-runs after it does. An out-of-
 date request is refused on the Keshet side, so keep it true rather than
 letting it drift.
+## Job three: the app spec
+
+`.kst/app-spec.md` is the plain-language description of what the app does,
+and it is what Keshet measures every later change against. Its shape comes
+from the template that ships with this plugin at
+`${CLAUDE_PLUGIN_ROOT}/templates/app-spec.md`: a title line and five
+sections with exactly these headings, in this order:
+
+```
+## What the app does
+## Who uses it
+## Data it reads and writes
+## Systems it connects to
+## How people sign in
+```
+
+Keep the headings word for word, keep all five, and put a real answer under
+each - a few sentences at most, in the words the builder used with you.
+The sections and what belongs in them:
+
+- **What the app does** - the job it does for the people who use it, not
+  the tech. The `purpose` line in `DEPLOY_REQUEST.md`, in full sentences.
+- **Who uses it** - who opens it and what they do there. The same audience
+  that `DEPLOY_REQUEST.md` names, written as people.
+- **Data it reads and writes** - every kind of data the code actually
+  touches, and which of it the app changes. "Reads the leave calendar, never
+  writes it." Say "none" only when the code holds nothing and reaches
+  nothing.
+- **Systems it connects to** - every outside service or database in the
+  code, by name. Must agree with `data-sources` in the request.
+- **How people sign in** - Keshet sign-in, and any role or group the code
+  checks beyond it.
+
+### The one rule: the spec describes the code as it is now
+
+Keshet's side reads the spec next to the code that arrives with it, and
+**refuses the send when the two disagree**, whichever one is wrong. A spec
+that says "reads only" while the code writes; a spec that lists a database
+the code no longer uses; a section left generic when the code is specific:
+each of these fails the deployment on Keshet's side, after the builder has
+waited for it. So on every send, read the code first and then the spec,
+and make the spec true before you finish. The verifier checks this again
+before sending, and refuses if you left them apart.
+
+### First send
+
+Copy the template to `.kst/app-spec.md` and write every section from what
+you learned in the interview and in the code. No `CHANGE-ME` may remain,
+and no section may be empty - the send tooling refuses both.
+
+### Every send after the first
+
+Read the spec that is already there and compare it with what changed in the
+code since the last send. Two outcomes, and tell the builder which one it
+is:
+
+- **The app still does what the spec says** - wording, layout, styling, a
+  fix that changes no behaviour. Leave the spec exactly as it is. Say: "No
+  change to what the app does, so this can go out without IT looking at it
+  again."
+- **The app now does something the spec does not say** - new data, a new
+  system, a new group, a read that became a write, a different sign-in.
+  Update the section it belongs to, and say: "This changes what the app
+  does, so I've updated the spec and IT will review this one before it goes
+  live." Never soften the spec to avoid that review: Keshet compares the
+  code against the spec IT last approved, and a spec that does not match the
+  code fails the send outright.
+
+Never delete the file, never empty a section, and never write into it
+anything addressed to a reader other than IT.
+
 ## What you leave for the next agents
 
 - the app prepared against the build contract
 - a completed `DEPLOY_REQUEST.md` on disk, in the template's shape, with
   the `Requester` and `Local agent sign-off` blocks present and untouched
+- `.kst/app-spec.md` on disk, in the template's shape, true to the code
+  as it stands, and changed on this send only if the app's behaviour did
 - the app's name, as the builder approved it
 - the declared secret **names** - never values, which appear nowhere you
   write: not in the request, not in your record, not in a message
