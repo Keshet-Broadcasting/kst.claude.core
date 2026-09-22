@@ -349,6 +349,7 @@ const PLATFORM_PROVIDED = [
   'KEY_VAULT_URI',
   'KST_AZURE_APP_ID',
   'KST_AZURE_TENANT_ID',
+  'KST_CORRELATION_ID',
   'PORT',
 ];
 const platformDeclared = declaredKeys.filter((k) => PLATFORM_PROVIDED.includes(k));

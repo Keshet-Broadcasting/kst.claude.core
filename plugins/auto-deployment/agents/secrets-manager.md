@@ -19,7 +19,7 @@ Anything that grants access if copied: API keys, passwords, bearer and access to
 
 Not secrets, not to be removed: public URLs without credentials, client IDs and tenant IDs (identifiers, not credentials), the app's own name, port numbers, feature flags.
 
-**Never a secret, never declared, never asked for - the names Keshet sets on the running app itself:** `APP_NAME`, `PLATFORM_BUILD_ID`, `APPLICATIONINSIGHTS_CONNECTION_STRING`, `KEY_VAULT_URI`, `KST_AZURE_APP_ID`, `KST_AZURE_TENANT_ID`, `PORT`. The platform places these into the app's live environment at deploy time; the app reads them as ordinary environment variables and they are simply absent locally.
+**Never a secret, never declared, never asked for - the names Keshet sets on the running app itself:** `APP_NAME`, `PLATFORM_BUILD_ID`, `APPLICATIONINSIGHTS_CONNECTION_STRING`, `KEY_VAULT_URI`, `KST_AZURE_APP_ID`, `KST_AZURE_TENANT_ID`, `KST_CORRELATION_ID`, `PORT`. The platform places these into the app's live environment at deploy time; the app reads them as ordinary environment variables and they are simply absent locally.
 
 - If one appears in `declared-secrets` or in `.env`, remove it from both - the send tooling refuses a request that declares one.
 - The builder cannot hold a value for any of them, so never ask things like "what is the monitoring connection string?" or "shall we deploy without telemetry?".

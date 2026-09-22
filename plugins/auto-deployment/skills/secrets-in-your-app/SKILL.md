@@ -1,6 +1,6 @@
 ---
 name: secrets-in-your-app
-description: Load this skill whenever the user mentions API keys, passwords, tokens, connection strings, `.env` files, or connecting the app to any other system - a database, an AI service, SharePoint, an internal API. Trigger immediately when someone is about to put a key, password, or URL directly into the code, and when they say "the API key isn't working", "it can't reach the database", or "it works on my machine but not after deploying". V:0.1.14
+description: Load this skill whenever the user mentions API keys, passwords, tokens, connection strings, `.env` files, or connecting the app to any other system - a database, an AI service, SharePoint, an internal API. Trigger immediately when someone is about to put a key, password, or URL directly into the code, and when they say "the API key isn't working", "it can't reach the database", or "it works on my machine but not after deploying". V:0.1.15
 ---
 
 # Secrets in your app
@@ -89,7 +89,7 @@ The deployment request lists secret **names** - `SHAREPOINT_CLIENT_SECRET`,
 
 Some environment variables the app reads are placed there by Keshet at deploy
 time, not by the builder: `APP_NAME`, `PLATFORM_BUILD_ID`, `APPLICATIONINSIGHTS_CONNECTION_STRING`,
-`KEY_VAULT_URI`, `KST_AZURE_APP_ID`, `KST_AZURE_TENANT_ID`, `PORT`. They are not declared, not put in `.env`,
+`KEY_VAULT_URI`, `KST_AZURE_APP_ID`, `KST_AZURE_TENANT_ID`, `KST_CORRELATION_ID`, `PORT`. They are not declared, not put in `.env`,
 and not asked for - locally they are absent and the app must cope with that.
 The builder cannot know their values, so never ask; if one looks required,
 that is a code fix or a platform-team note, never a question.

@@ -1,6 +1,6 @@
 ---
 name: verifying-and-sending
-description: The last step of the deploy chain, loaded by the deploying-your-app skill and only by it, after every check agent has reported into the run record. You confirm that every required check ran and approved against the code as it stands right now, that the deployment details are complete enough for IT to review, emit the sign-off record, and run the send tooling in this conversation so the builder sees the sign-in address and code the moment they appear. It is the only thing that ever contacts the Keshet deployment service, and the deploy request is the only thing ever sent to it. V:0.1.14
+description: The last step of the deploy chain, loaded by the deploying-your-app skill and only by it, after every check agent has reported into the run record. You confirm that every required check ran and approved against the code as it stands right now, that the deployment details are complete enough for IT to review, emit the sign-off record, and run the send tooling in this conversation so the builder sees the sign-in address and code the moment they appear. It is the only thing that ever contacts the Keshet deployment service, and the deploy request is the only thing ever sent to it. V:0.1.15
 ---
 
 # Verifying and sending - you are the verifier
