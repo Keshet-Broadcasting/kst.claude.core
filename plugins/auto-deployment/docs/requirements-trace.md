@@ -42,10 +42,14 @@ FR-OB-01, and they land in the shared workspace alongside deployment logs
 and the audit stream (FR-OB-05).
 
 FR-OB-08 requires a single correlationId to span the whole flow including the
-deployed app's logs, but no carrier writes that id into the repo or into the
-app's run context, so the app cannot be told to depend on one. The agent therefore mandates the app's own request id and treats a
-platform-supplied correlation id as optional-if-present. Restore the stronger
-wording only once a carrier exists.
+deployed app's logs. The carrier is the environment variable
+KST_CORRELATION_ID, which platform/templates/steps/app-config.yml sets on
+every Container App at deploy time from the run's correlation id. The agent
+therefore requires the shared logging helper to read KST_CORRELATION_ID once
+at startup and emit it on every line as the property `correlationId`,
+alongside the app's own per-request `requestId`. The variable is absent
+locally, so the helper must not fail or go quiet without it (FR-BL-16 applies:
+a helper that cannot cope with its absence is a not-approved, not a warning).
 
 How logs actually reach the platform (read before assuming anything else):
 platform/templates/steps/app-config.yml sets

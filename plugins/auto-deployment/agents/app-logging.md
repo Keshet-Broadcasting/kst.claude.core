@@ -31,14 +31,15 @@ Three kinds of events, wherever they happen in the app:
 - Every line is **structured**: a short human-readable message plus named properties, emitted through one shared logging helper - not bare print statements scattered through the code. If the project already has a helper, extend it; if not, create one small module and route everything through it.
 - Every line has at least: a timestamp, a severity, the app's name, the message, and the named properties that make it findable.
 - The app generates its **own request id** at the start of each incoming request and puts it on every line that request produces, including lines written by anything it calls onward. That id is what makes the log joinable, so it is not optional.
-- If the platform happens to supply a correlation id in the app's environment, prefer it and carry it through unchanged rather than minting a second id - but do not assume one is there, and never write logging that breaks or goes quiet when it is absent.
+- Keshet also gives every deployed app a **correlation id**, in the environment variable `KST_CORRELATION_ID`. It is the thread that ties this app's logs to the deployment that produced them and to everything else the platform recorded about it. The shared helper reads it once at startup and puts it on every line as the property `correlationId`, next to the app's own per-request `requestId` - both, always; they answer different questions. Carry the platform's value through unchanged; never mint or replace it.
+- That variable does not exist on the builder's machine. The helper must start, log, and behave exactly the same without it - leave `correlationId` out of the line, or set it empty, but never fail, warn on every line, or go quiet.
 
 ### Errors deserve extra care
 
 An error log must let two audiences act without reaching the builder: the platform team looking at the central workspace, and the deploy-failure flow walking backwards from a symptom. Each error line carries:
 
 - what the app was trying to do, in domain terms ("saving the schedule for channel 12"), not just the raw exception text
-- the operation or route it happened in, and any request or correlation id in scope
+- the operation or route it happened in, the request id, and the correlation id when the platform supplied one
 - the underlying error message and type
 - enough of the inputs to reproduce the situation - within the content rules below, which win every time the two conflict
 
@@ -57,7 +58,7 @@ After writing the logging code, grep your own work for these mistakes before app
 
 The platform connects every deployed app to central monitoring at deploy time, through a setting it places into the app's live environment itself. The builder cannot turn that off - and you cannot exercise it from here, because the setting exists only on the platform.
 
-The names Keshet sets on the running app - `APP_NAME`, `PLATFORM_BUILD_ID`, `APPLICATIONINSIGHTS_CONNECTION_STRING`, `KEY_VAULT_URI`, `KST_AZURE_APP_ID`, `KST_AZURE_TENANT_ID`, `PORT` - are never declared secrets, never go in `.env`, and their values are never asked for; nobody on the builder's side has them.
+The names Keshet sets on the running app - `APP_NAME`, `PLATFORM_BUILD_ID`, `APPLICATIONINSIGHTS_CONNECTION_STRING`, `KEY_VAULT_URI`, `KST_AZURE_APP_ID`, `KST_AZURE_TENANT_ID`, `KST_CORRELATION_ID`, `PORT` - are never declared secrets, never go in `.env`, and their values are never asked for; nobody on the builder's side has them.
 
 Verify precisely what can be verified on this machine:
 

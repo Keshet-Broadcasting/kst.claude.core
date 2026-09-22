@@ -1,6 +1,6 @@
 ---
 name: deploying-your-app
-description: Load whenever the builder expresses deploy intent in any wording - "deploy", "publish", "ship it", "put it live", "share it with the team", "send it", "give them a link", or anything that means another person needs to open the app - and after any conversation that changed code, to decide which deployment checks must re-run. You then act as the orchestrator: you launch the check agents as sub-agents in a fixed order, do the two builder-conversation steps (who may open the app, what it is called) yourself, talk to the builder yourself when an agent needs their answer, and hand the run record to the verifier, which is the only thing that ever sends. The builder never names an agent; this skill is how their intent becomes the right sequence of checks. V:0.1.14
+description: Load whenever the builder expresses deploy intent in any wording - "deploy", "publish", "ship it", "put it live", "share it with the team", "send it", "give them a link", or anything that means another person needs to open the app - and after any conversation that changed code, to decide which deployment checks must re-run. You then act as the orchestrator: you launch the check agents as sub-agents in a fixed order, do the two builder-conversation steps (who may open the app, what it is called) yourself, talk to the builder yourself when an agent needs their answer, and hand the run record to the verifier, which is the only thing that ever sends. The builder never names an agent; this skill is how their intent becomes the right sequence of checks. V:0.1.15
 ---
 
 # Deploying your app - you are the orchestrator
@@ -84,7 +84,7 @@ When an agent believes it needs such a value, one of two things is true:
 - **Keshet sets it on the running app itself.** These names arrive in the
   app's live environment at deploy time and are absent locally, which is
   normal: `APP_NAME`, `PLATFORM_BUILD_ID`, `APPLICATIONINSIGHTS_CONNECTION_STRING`,
-`KEY_VAULT_URI`, `KST_AZURE_APP_ID`, `KST_AZURE_TENANT_ID`, `PORT`. The app reads them as ordinary environment variables; they
+`KEY_VAULT_URI`, `KST_AZURE_APP_ID`, `KST_AZURE_TENANT_ID`, `KST_CORRELATION_ID`, `PORT`. The app reads them as ordinary environment variables; they
   are never declared as secrets and never asked for.
 - **It is a platform-team problem.** Report **not approved** with one plain
   sentence for the builder ("something on Keshet's side needs setting up
