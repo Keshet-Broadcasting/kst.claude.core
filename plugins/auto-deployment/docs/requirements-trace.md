@@ -228,3 +228,17 @@ service's `/api/apps/auth/refresh` (the device sign-in requests
 `offline_access`); kst.auth.api does not check a token's age, so a sign-in
 taken at the start of the run is as good at the send. A device code at the
 send is only the fallback when the renewal is refused.
+
+## scripts/tree-digest.mjs and the run-record chain (0.1.17)
+
+The run record keeps an append-only `chain` of every step with the tree
+digest before and after it. An approved result stays current while every
+later change came from a later step of the same run, so the four
+code-changing agents (deployment, secrets-manager, auth, app-logging) no
+longer void each other. What covers their changes is what runs on the
+finished tree: security-review (must come after the last change) and the
+verifier's preflight re-run when the tree moved after deployment. A change
+from outside the chain still voids everything before it (fail closed,
+FR-BL-16). The digest is content-only (git's file set, never HEAD), so a
+checkpoint commit voids nothing. The sign-off digest (`--sent`) is local
+evidence only: kst.auth.api accepts `signoff` without validating it today.

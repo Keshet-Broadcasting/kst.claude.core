@@ -1,6 +1,6 @@
 ---
 name: secrets-in-your-app
-description: Load this skill whenever the user mentions API keys, passwords, tokens, connection strings, `.env` files, or connecting the app to any other system - a database, an AI service, SharePoint, an internal API. Trigger immediately when someone is about to put a key, password, or URL directly into the code, and when they say "the API key isn't working", "it can't reach the database", or "it works on my machine but not after deploying". V:0.1.16
+description: Load this skill whenever the user mentions API keys, passwords, tokens, connection strings, `.env` files, or connecting the app to any other system - a database, an AI service, SharePoint, an internal API. Trigger immediately when someone is about to put a key, password, or URL directly into the code, and when they say "the API key isn't working", "it can't reach the database", or "it works on my machine but not after deploying". V:0.1.17
 ---
 
 # Secrets in your app

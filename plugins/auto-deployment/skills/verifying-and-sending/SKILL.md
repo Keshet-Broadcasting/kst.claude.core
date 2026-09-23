@@ -1,6 +1,6 @@
 ---
 name: verifying-and-sending
-description: The last step of the deploy chain, loaded by the deploying-your-app skill and only by it, after every check agent has reported into the run record. You confirm that every required check ran and approved against the code as it stands right now, that the deployment details are complete enough for IT to review, emit the sign-off record, and run the send tooling in this conversation so the builder sees the sign-in address and code the moment they appear. It is the only thing that ever sends anything to the Keshet deployment service (the intake's sign-in sends nothing of the app), and the deploy request is the only thing ever sent to it. V:0.1.16
+description: The last step of the deploy chain, loaded by the deploying-your-app skill and only by it, after every check agent has reported into the run record. You confirm that every required check ran and approved against the code as it stands right now, that the deployment details are complete enough for IT to review, emit the sign-off record, and run the send tooling in this conversation so the builder sees the sign-in address and code the moment they appear. It is the only thing that ever sends anything to the Keshet deployment service (the intake's sign-in sends nothing of the app), and the deploy request is the only thing ever sent to it. V:0.1.17
 ---
 
 # Verifying and sending - you are the verifier
@@ -73,14 +73,29 @@ orchestrator to run the chain. Check all of this:
   full deploy chain, nothing is not applicable. Keshet holds its own view of
   what may be skipped and does not take the record's word for it, so a
   doubtful "not applicable" fails here rather than there.
-- **No result is stale.** A result is stale if any file in the app changed
-  after that agent finished - compare each agent's recorded tree digest
-  against the tree as it stands now. The run-record digest leaves out
-  `DEPLOY_REQUEST.md`, `.env` and `.kst-deploy/`: agents write the request
-  file as part of their job, and a write to it must not void the checks that
-  ran before it. The request file has its own completeness check in step 2. A stale result is not approved, no matter what
-  it said when it was fresh, because it describes an app that no longer
-  exists. A one-line fix counts. A formatting change counts.
+- **No result is stale.** Work out the digest now with
+  `node "${CLAUDE_PLUGIN_ROOT}/scripts/tree-digest.mjs" <app folder>` and
+  read the record's `chain`. A result is current only while the chain from
+  its line to now is unbroken: every later line's `before` equals the
+  `after` above it, and the last `after` equals the digest now - so every
+  change since it was made by a later step of this same run. A break means
+  something outside the chain changed the code, and every result before the
+  break is stale. The digest leaves out `DEPLOY_REQUEST.md`, `.env*` and
+  `.kst-deploy/`, which the steps write as part of their job; the request
+  file has its own completeness check in step 2. A stale result is not
+  approved, no matter what it said when it was fresh, because it describes
+  an app that no longer exists. A one-line fix counts. A formatting change
+  counts.
+- **security-review read the finished code.** Its latest line must come
+  after the last line that changed the digest. A change made after it -
+  even by an agent in the chain - has not been reviewed.
+- **The finished code still builds.** When the digest now differs from the
+  `after` of deployment's latest line, a later step changed the code after
+  the build was proven. Run the build check once more on the finished code
+  - `node "${CLAUDE_PLUGIN_ROOT}/scripts/preflight.mjs" <app folder>` - and
+  read the JSON on its last line. `ok: true` settles it; anything else is
+  not approved and goes back to the deployment agent. When the digests
+  match, deployment's own run already proved this code and nothing re-runs.
 
 If any of these fails, stop. Tell the builder in plain language what is
 happening and go back to the deploying-your-app chain to re-run what is needed:
@@ -233,11 +248,13 @@ on the Keshet side, and an extra field or a missing one is a refusal:
   Write the record honestly - a `not-approved` entry is written as
   `not-approved`, and then you do not send. You never edit a result.
 - `treeDigest` is what makes the record checkable rather than merely
-  present. Compute it over **exactly the set of files you are about to
-  send**: apply the exclusions first (`node_modules/`, `.git/`, `.next/`,
-  `dist/`, `build/`, `.kst-deploy/`, and `.env` along with every `.env.*`), then take the
-  sorted list of (path, sha256 of the file's decoded bytes) pairs and digest
-  that. Decoded bytes, not the transport encoding. Keshet recomputes the
+  present. It covers **exactly the set of files you are about to send**,
+  and one command works it out:
+  `node "${CLAUDE_PLUGIN_ROOT}/scripts/tree-digest.mjs" --sent <app folder>`.
+  It applies the send's exclusions (`node_modules/`, `.git/`, `.next/`,
+  `dist/`, `build/`, `.kst-deploy/`, and `.env` along with every `.env.*`),
+  then digests the sorted list of (path, sha256 of the file's bytes) pairs.
+  Decoded bytes, not the transport encoding. Keshet recomputes the
   same digest over the same set and refuses on any mismatch, so digesting a
   different set than you send guarantees a refusal.
   The secret values you send alongside the tree are **not** part of this
