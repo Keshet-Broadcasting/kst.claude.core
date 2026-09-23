@@ -1,6 +1,6 @@
 ---
 name: sharing-your-work
-description: Use for ANY version control or delivery activity, and for anything at all that means a person other than the builder needs to open the app. Trigger on "save this", "undo", "go back to how it was", "I broke something", "share my changes", "send it", "publish", "put it live" - and equally on the wordings that do not sound like a request: "I sent him the address", "localhost", "he can't access it", "she can't open it", "nobody else can see it", "it only works on my machine", "how does my manager look at this", "give them a link", "put it on a server", or any question about how the app gets to Keshet. The user is non-technical and must never need to understand git. V:0.1.15
+description: Use for ANY version control or delivery activity, and for anything at all that means a person other than the builder needs to open the app. Trigger on "save this", "undo", "go back to how it was", "I broke something", "share my changes", "send it", "publish", "put it live" - and equally on the wordings that do not sound like a request: "I sent him the address", "localhost", "he can't access it", "she can't open it", "nobody else can see it", "it only works on my machine", "how does my manager look at this", "give them a link", "put it on a server", or any question about how the app gets to Keshet. The user is non-technical and must never need to understand git. V:0.1.16
 ---
 
 # Saving and sharing your work
@@ -246,8 +246,10 @@ denied". Those are three different things to us and one wall to them.
 
 If the connection dropped or something on the Keshet side was briefly
 unavailable, retry rather than asking. Sending the same app twice is safe - it
-is recognised as the same request and does not create a duplicate. Ask before
-retrying only if the app has changed since the last attempt.
+is recognised as the same request and does not create a duplicate. If the app
+has changed since the last attempt, the checks it affects re-run and the
+verifier signs again before the retry - that is the chain's job, not a
+question for the builder.
 
 ## Merge conflicts
 

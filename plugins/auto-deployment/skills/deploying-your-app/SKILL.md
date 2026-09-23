@@ -1,6 +1,6 @@
 ---
 name: deploying-your-app
-description: Load whenever the builder expresses deploy intent in any wording - "deploy", "publish", "ship it", "put it live", "share it with the team", "send it", "give them a link", or anything that means another person needs to open the app - and after any conversation that changed code, to decide which deployment checks must re-run. You then act as the orchestrator: you launch the check agents as sub-agents in a fixed order, do the two builder-conversation steps (who may open the app, what it is called) yourself, talk to the builder yourself when an agent needs their answer, and hand the run record to the verifier, which is the only thing that ever sends. The builder never names an agent; this skill is how their intent becomes the right sequence of checks. V:0.1.15
+description: Load whenever the builder expresses deploy intent in any wording - "deploy", "publish", "ship it", "put it live", "share it with the team", "send it", "give them a link", or anything that means another person needs to open the app - and after any conversation that changed code, to decide which deployment checks must re-run. You then act as the orchestrator: you launch the check agents as sub-agents in a fixed order, ask the builder every question once, at the start (the intake, which also signs them in), then run the whole chain without stopping for approval, and hand the run record to the verifier, which is the only thing that ever sends. The builder never names an agent; this skill is how their intent becomes the right sequence of checks. V:0.1.16
 ---
 
 # Deploying your app - you are the orchestrator
@@ -13,11 +13,15 @@ view, you can ask them a question and wait for the answer, and you launch
 the checks as sub-agents from here.
 
 You decide which steps run, in what order, and you collect what each one
-concluded so the verifier can check it. Five steps are agents you launch; two
-are conversations with the builder that you hold yourself (steps 5 and 7). You
-never do an agent's work yourself, and you do not talk to the Keshet deployment service - ever. Only
-the verifier hands work to that service, and only as the last step of a full
-chain. No other agent has any contact with it, in either direction.
+concluded so the verifier can check it. Five steps are agents you launch;
+three are yours: the intake at the start (step 0), the only point in the run
+where the builder is asked anything, and steps 5 and 7, which record and
+check what the intake settled. You
+never do an agent's work yourself, and you never hand anything to the Keshet
+deployment service. The one contact you make is the intake's sign-in, through
+the send tooling in its sign-in mode, which reads and sends nothing of the
+app. Only the verifier hands work to that service, and only as the last step
+of a full chain. No agent has any contact with it, in either direction.
 
 The person you serve is not a developer. Everything they see from you is
 plain language: no agent names unless it helps them ("I'm checking who can
@@ -40,16 +44,33 @@ on skipping: **if you are unsure whether an agent needs to re-run, re-run
 it.** A re-run costs a little. Skipping costs more, because a skipped check surfaces
 later as a refused deploy or, worse, as an app that shipped unchecked.
 
-## Before anything else: Keshet must be reachable, and the project must have version history
+## Before anything else: tell them what is coming
 
-Run the send tooling in check mode first - `send-deploy.sh --check`
-(macOS/Linux) or `send-deploy.ps1 --check` (Windows) from this plugin's
-`scripts/` folder. It only asks whether Keshet's deployment service answers
-from this network and exits. If it does not, stop before any agent runs and
-tell the builder in one sentence: "Keshet's deployment service isn't
-reachable from here - usually that means the Keshet VPN isn't connected.
-Connect it and tell me, and I'll carry on." Finding this out after seven
-checks is the expensive way.
+When a deploy starts a new run - no run record, or one without an `intake`
+entry - your first message, before any command runs, tells the builder
+what the next while looks like, in words like these:
+
+> "I'll get your app ready for Keshet and send it. This takes a while:
+> I prepare the project for deployment and run a series of checks on it.
+> Three things from you before I start:
+> - be connected to Keshet - the VPN if you're working remotely, or the
+>   Keshet office WiFi;
+> - in a moment you'll sign in to Keshet in your browser, so keep one
+>   handy;
+> - I'll ask all my questions together, right at the start. After that you
+>   can leave me to it - I won't need you again unless the checks find
+>   something only you can decide."
+
+Then the intake (step 0) starts at once. Its sign-in also checks that Keshet
+is reachable from this network, and stops the run before any agent starts if
+it is not - finding that out after seven checks is the expensive way.
+
+When the run is resumed instead - the record already has an `intake` entry,
+say after a refusal or an outage - skip this message and the intake. One line
+is enough: "Picking up where we left off - make sure you're still on the
+Keshet VPN or the office WiFi."
+
+## The project must have version history
 
 Before either situation proceeds, check the project is a local git repo:
 `git status` in the project root. If there is no repo - or git itself is not
@@ -102,9 +123,9 @@ reached, the builder closes the laptop and comes back tomorrow in a new
 chat. So the chain's state lives on disk, not only in this conversation:
 **`.kst-deploy/run-record.json`** in the project root. You read it first,
 you write it after every step, and the verifier deletes it once Keshet has
-accepted the send. A builder question no longer interrupts anything - you
-ask it yourself and carry on - but the record still makes the answer
-durable if the conversation ends before the send does.
+accepted the send. The builder's answers live in `DEPLOY_REQUEST.md` from
+the moment the intake ends, so a run resumed in a new conversation does not
+ask them again.
 
 Its shape:
 
@@ -112,6 +133,12 @@ Its shape:
 {
   "startedAt": "2026-09-15T09:00:00Z",
   "intent": "deploy",
+  "intake": {
+    "finishedAt": "2026-09-15T09:02:00Z",
+    "audience": "individuals: dana.cohen@example.com",
+    "dataSources": "finance system - sales figures per team",
+    "signedIn": true
+  },
   "agents": {
     "deployment": {
       "verdict": "approved",
@@ -122,8 +149,8 @@ Its shape:
     }
   },
   "pending": {
-    "agent": "access-manager",
-    "question": "Who should be able to open this app - named people, or a team?",
+    "agent": "auth",
+    "question": "The app reads from the finance system, but that isn't in what IT will see. Should I add it, or should the app not be reading from there?",
     "askedAt": "2026-09-15T09:05:00Z",
     "answer": null
   }
@@ -139,31 +166,35 @@ Its shape:
    leaves out `DEPLOY_REQUEST.md`, `.env*` and `.kst-deploy/`: writing the
    request file is part of the job (deployment, secrets-manager, and your own
    steps 5 and 7 all do), and that must not void the checks that ran before. Code changes are what stale a result.
-3. If `pending` is set (a question asked in an earlier conversation that
-   was never answered), ask it again now, in one sentence, and wait. When
-   the builder answers, write their words into `pending.answer`, launch
-   **that agent only** with the answer (or, for `access-manager` and
-   `create-repo`, finish that step yourself), and continue the chain from
-   the step after it.
-4. Otherwise, walk the chain in order. **Skip a step only when its entry
+3. If the record has no `intake` entry, this is a new run: send the opening
+   message and run the intake. Intake questions are never written as
+   `pending` - a run whose intake did not finish simply redoes it, offering
+   back whatever answers `DEPLOY_REQUEST.md` already holds.
+4. If `pending` is set (an agent's question from an earlier conversation
+   that was never answered), ask it again now, in one sentence, and wait.
+   When the builder answers, write their words into `pending.answer`, launch
+   **that agent only** with the answer, and continue the chain from the step
+   after it.
+5. Otherwise, walk the chain in order. **Skip a step only when its entry
    is `approved` and its `treeDigest` equals the current one.** Anything
    else - missing, not-approved, a different digest - runs. Skipping is the
    only shortcut, and it is safe because the digest proves nothing changed.
+   The intake is not part of this walk: it ran in point 3, or it already
+   ran in this run - either way, do not ask again.
 
 **After every agent returns**, write its five-field record into `agents`
-before doing anything else. If it returned a `question`, write that as
-`pending`, put the question to the builder in their language, and **wait
-for their answer** - this is a conversation, not a report. Then write the
-answer, re-run that one agent with it, and continue. Nothing before that
-point re-runs.
+before doing anything else. If it returned a `question` - rare after an
+intake, and only for something the code turned up that the answers did not
+cover - write that as `pending`, put the question to the builder in their
+language, and **wait for their answer**. Then write the answer, re-run that
+one agent with it, and continue. Nothing before that point re-runs.
 
 **Steps 5 and 7 are yours**, and they get the same five-field entry, under
 the keys `access-manager` and `create-repo` (the key names are kept so the
 verifier's list and any existing record stay valid). You write the entry
-when the step is done, with the current digest. Because you talk to the
-builder directly, there is no question to hand back: ask, wait, write the
-answer. Set `pending` only so the question survives a conversation that
-ends first.
+when the step is done, with the current digest. Neither asks the builder
+anything: the intake settled the audience and the name, and these steps
+record and check them.
 
 **Housekeeping you own:** create the `.kst-deploy/` folder when you first
 write the record, and make sure `.gitignore` covers `.kst-deploy/` - add
@@ -180,9 +211,9 @@ Five steps - deployment, secrets-manager, auth, app-logging,
 security-review - are **separate agents that you launch with the `Agent`
 tool** (the plugin's agents, `auto-deployment:<name>` where the tool asks
 for a scoped name), one at a time, in order. You wait for each to finish,
-read what it concluded, and only then move on. Two steps - 5 and 7 - you do
-here, in this conversation, because they are conversations with the
-builder: when you reach one, read its reference file and follow it.
+read what it concluded, and only then move on. Three steps - 0, 5 and 7 -
+you do here, in this conversation, because they hold the builder's answers:
+when you reach one, read its reference file and follow it.
 
 You never do an **agent's** work yourself. Reading the code and concluding
 "the secrets look fine" or "the security review would pass" is not running
@@ -209,6 +240,8 @@ having already changed the code, so running them out of order checks a state
 that no longer exists by the time the next one runs.
 
 ```
+0. intake - YOU, here: sign-in and every question, at once. Read
+                    references/intake.md (run-record key: intake)
 1. deployment       agent
 2. secrets-manager  agent
 3. auth             agent
@@ -223,6 +256,9 @@ that no longer exists by the time the next one runs.
 
 Why this order:
 
+- **The intake first**, so every question the builder must answer is behind
+  them before the long part starts, and the sign-in is done while they
+  answer rather than at the end, when they have walked away.
 - **secrets-manager before auth**, because auth wiring often needs a secret
   and would otherwise hardcode one - the exact thing secrets-manager exists
   to remove.
@@ -231,9 +267,9 @@ Why this order:
   that only reads it. A code change after a read-only check voids that check,
   so the mutators go first and the validators run once, against a tree that
   is finished.
-- **The audience (step 5) before security-review**, so the review sees the
-  real audience rather than a placeholder. It writes only the request file,
-  which the digest leaves out, so it voids nothing before it.
+- **The audience check (step 5) before security-review**, so the review sees
+  the real audience rather than a placeholder. It writes only the request
+  file, which the digest leaves out, so it voids nothing before it.
 - **security-review after every agent that changes code**, so it reads the
   finished state. A review that runs early reviews something that no longer
   exists.
@@ -244,16 +280,17 @@ Why this order:
 - **verifier last, always.** It is the only thing that may hand work to the
   Keshet deployment service. It is not an agent: when all seven steps are
   in the run record, you load the `verifying-and-sending` skill and follow
-  it here, in this conversation, because the send prints a sign-in code the
-  builder has to see the moment it appears. No agent runs the send.
+  it here, in this conversation: the send normally reuses the intake's
+  sign-in, but when that has lapsed it prints a sign-in code the builder has
+  to see the moment it appears. No agent runs the send.
 
 When only some steps re-run after a change, they still run in this relative
 order among themselves. If security-review re-runs, it re-runs after every
 other code-changing agent that is re-running, never before.
 
 **Step 7 is an ordinary part of the chain and runs on every deploy**, not
-only the first one. Where the name is already agreed and recorded, you
-confirm that in a sentence and the step is short. Never make it conditional
+only the first one. The intake agreed the name; step 7 checks it is
+recorded and the request is complete, and it is short. Never make it conditional
 on whether this app has been sent before, and never ask anyone - including
 the builder - to tell you which it is. Nothing on this machine can know;
 Keshet works it out from what only Keshet can see, and a send is a send
@@ -271,20 +308,22 @@ An agent that cannot finish without the builder's answer returns
 question of the permitted kind (see above). Record all of it in the run
 record for every run - the verifier consumes exactly this record per
 agent, and a result without a timestamp cannot be checked for staleness.
-Your own two steps produce the same record, written by you.
+Your own steps 5 and 7 produce the same record, written by you; the
+intake writes its own short `intake` entry instead.
 
 | Step | You pass it | Approved means |
 | :-- | :-- | :-- |
-| deployment | What changed since its last run (all of it on a full chain) | The app matches the platform's build shape, the deployment details in `DEPLOY_REQUEST.md` are complete: what the app is for, what data it reaches, and who it is for - and the app spec in `.kst/app-spec.md` describes the code as it is now, updated on this send only if what the app does changed |
+| 0 - intake (key `intake`) | Nothing - you do this yourself, following `references/intake.md` | The builder is signed in (or will be at the send), approved the name, purpose, catalogue line, tags and data sources you drafted, and chose the audience - all of it written into `DEPLOY_REQUEST.md` |
+| deployment | What changed since its last run (all of it on a full chain), and the builder's yes if the intake asked to move the app into Keshet's shape. The builder's answers are already in `DEPLOY_REQUEST.md`; it never interviews them | The app matches the platform's build shape, the deployment details in `DEPLOY_REQUEST.md` are complete: what the app is for, what data it reaches, and who it is for - and the app spec in `.kst/app-spec.md` describes the code as it is now, updated on this send only if what the app does changed |
 | secrets-manager | The current source tree, plus any new external connection the conversation introduced | No key, password, or token is left anywhere in the source. Each one lives in the app's own `.env` file, which is where real values belong on this machine: it is kept out of version control and out of everything sent to Keshet. Every secret the app needs is declared by name, and those names are exactly the keys in `.env` |
-| auth | The list of data sources from the deployment details, and the declared secret names | The app passes each end user's own sign-in through to every data source it touches, so the data source decides what that user may see |
+| auth | The list of data sources from the deployment details, what each one holds in the builder's words from the intake, and the declared secret names | The app passes each end user's own sign-in through to every data source it touches, so the data source decides what that user may see |
 | app-logging | The current source tree and the list of user-facing actions the app has | Logs exist for user actions, errors, and data access, and the configuration will actually deliver them - not just that logging lines were added |
-| 5 - choosing the audience (key `access-manager`) | Nothing - you do this yourself, following `references/choosing-the-audience.md`. Any audience from the deployment interview is the builder's earlier words, never a default to keep silently | The builder made an explicit, confirmed choice of who may open the app - named people or a team. No default, and no unconfirmed "everyone". This step owns the final recorded audience |
+| 5 - choosing the audience (key `access-manager`) | Nothing - you do this yourself, following `references/choosing-the-audience.md`, from the builder's answer at the intake | The builder made an explicit choice of who may open the app at the intake - named people or a team, no default, and no unconfirmed "everyone" - and it is recorded in valid form. This step owns the final recorded audience |
 | security-review | The entire current state of the app, not a diff | The whole finished tree was read for leaked secrets and misconfigurations, and anything found was fixed and re-checked |
-| 7 - settling the name (key `create-repo`) | Nothing - you do this yourself, following `references/settling-the-name.md`, from what the app is currently called and what the deployment interview established | The builder has approved the app's name and that name is written into `DEPLOY_REQUEST.md`, the deployment details are complete, and the description and tags are recorded |
+| 7 - settling the name (key `create-repo`) | Nothing - you do this yourself, following `references/settling-the-name.md`, from the name the builder approved at the intake | The builder has approved the app's name and that name is written into `DEPLOY_REQUEST.md`, the deployment details are complete, and the description and tags are recorded |
 | verifier (the `verifying-and-sending` skill, loaded here) | The run record on disk: every step above, its verdict, its finished-at timestamp, its what-was-checked line, its findings and its tree digest | The verifier takes it from here. Its approval is the only "ready" that exists |
 
-If an agent - or one of your own two steps - ends **not approved**, stop the chain there. Fix what it
+If an agent - or one of your own steps - ends **not approved**, stop the chain there. Fix what it
 found - with the builder where the fix is theirs to decide, on their behalf
 where it is mechanical - then re-run that step, and then continue. Never
 carry a not-approved result forward hoping the verifier will overlook it.
@@ -301,8 +340,9 @@ Use these as a starting point, not a ceiling:
 - **A new external connection** - an API, a database, a service - means
   secrets-manager and auth re-run, and the deployment details need updating,
   so deployment re-runs too.
-- **Anything touching who uses the app** means step 5 is redone. Never
-  answer an audience question yourself; that decision is the builder's alone.
+- **The builder changing who should use the app** means the audience
+  question is asked again and step 5 redone. Never answer an audience question
+  yourself; that decision is the builder's alone.
 - **A new page, action, or feature** means app-logging re-runs to cover it.
 - **Anything that changes what the app does** - new data, a new system, a
   read that became a write, a change to sign-in - means deployment re-runs so
@@ -329,13 +369,23 @@ skipped check and is treated as one.
 
 - **The builder never names agents, and never needs to.** Their words are
   intent; the chain is your job.
+- **Ask once, then run.** Every question goes in the intake. After it, never
+  stop to ask permission: not to continue, not to confirm what the intake
+  already settled, and not to send - their request to deploy is the
+  go-ahead for the whole run. The only questions after the intake are ones
+  the code forced that the answers did not cover: a system the app reaches
+  that was not named, what a system holds when the intake did not say, a key
+  the app needs that the intake did not collect. Beyond those, only a name
+  Keshet refused, a sign-in code when the kept sign-in lapsed, or a change
+  the builder starts themselves brings them back.
 - **Never skip the verifier.** There is no change small enough. A one-line
   fix after the chain ran means the chain result no longer describes the
   app, and the verifier will say so.
-- **Never call the Keshet deployment service yourself**, and never suggest
-  a way around it. The verifier is the only component that hands work over,
-  and it is the only one with any contact at all - there is nothing else to
-  ask it, and no way to ask.
+- **Never hand anything to the Keshet deployment service yourself**, and
+  never suggest a way around it. The verifier is the only component that
+  hands work over. Your only contact is the intake's sign-in, through the
+  send tooling in its sign-in mode - there is nothing else to ask the
+  service, and no way to ask.
 - **Never decide whether a send is the app's first.** There is one way to
   send, it serves both cases, and Keshet works out which one it is. Never run
   a different set of agents, tell a different story, or skip a step on the
@@ -352,15 +402,10 @@ skipped check and is treated as one.
 
 ## Reporting to the builder
 
-While the chain runs, keep them informed in their language, briefly:
-
-> "Before this can go to Keshet I run a set of checks: that it's built the
-> way the platform expects, that no passwords are left in the code, that it
-> reads data as whoever is signed in, that you've chosen who can open it,
-> and that it keeps a record of who uses it. Starting now."
-
-When something needs their input - the audience, a missing purpose line -
-ask the question plainly and wait. When something failed, say what needs to
-change, not what rule it broke. When everything is done, the verifier
+Start with the opening message above, then the intake. While the chain
+runs, one short line per step at most, in their language - they may well
+have stepped away, so nothing you say after the intake should need an
+answer. When something failed, say what needs to change, not what rule it
+broke. When everything is done, the verifier
 reports the outcome, not you: your last act in a deploy is handing the run
 record to the verifier and letting its answer be the answer.

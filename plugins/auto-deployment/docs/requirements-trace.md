@@ -210,3 +210,21 @@ anything the builder reads.
 ```
 
 Note (0.1.13): the deployment block says "no script ships with this plugin". That is no longer true - `scripts/preflight.mjs` and the send tooling ship with it. The naming point it made still holds: there is no name-checking script.
+
+## skills/deploying-your-app/references/intake.md (0.1.16)
+
+Step 0 of the chain. Every builder question of a run is asked once, before
+any agent: the orchestrator drafts the name, purpose, description, tags and
+data sources from the code for a yes-or-change, and asks the audience
+outright. FR-BL-07 (the deployment request) and FR-BL-19 (the name is
+proposed and approved) are satisfied here instead of in the deployment
+agent's interview; the audience rules of choosing-the-audience.md apply
+unchanged, and step 5 writes and checks the answer without asking again.
+
+The intake also runs `send-deploy --signin` in the background, so the
+builder's own sign-in (FR-BR-23) is acquired while they answer, not at the
+end. The send reuses the kept sign-in, renewing it silently through the
+service's `/api/apps/auth/refresh` (the device sign-in requests
+`offline_access`); kst.auth.api does not check a token's age, so a sign-in
+taken at the start of the run is as good at the send. A device code at the
+send is only the fallback when the renewal is refused.

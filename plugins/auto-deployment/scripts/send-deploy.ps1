@@ -10,7 +10,7 @@
   line is identical to send-deploy.sh, its macOS/Linux twin.
 
   Usage:
-    powershell -NoProfile -ExecutionPolicy Bypass -File .\send-deploy.ps1 [--check] [--signoff FILE] [APP_DIR]
+    powershell -NoProfile -ExecutionPolicy Bypass -File .\send-deploy.ps1 [--check | --signin] [--signoff FILE] [APP_DIR]
 
   Exit codes (the verifier acts on these; the .mjs owns them):
     0  accepted - the deployment run reached IT review or beyond

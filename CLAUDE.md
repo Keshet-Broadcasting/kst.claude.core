@@ -68,7 +68,7 @@ Rules:
 
 # Sending the app to Keshet
 
-This applies when the project is a Keshet builder app (the `auto-deployment` plugin is installed). When the user says "deploy", "publish", "ship it", "put it live", or "share it with the team", the deploy chain runs - they never have to name an agent. Load the `deploying-your-app` skill (from the plugin) and follow it: it owns the order of the checks, runs them, asks the user the few questions that are theirs, and sends only after every check has approved. Do not run the checks from memory and do not keep a second copy of the order here - a copy drifts, and a chain assembled from memory is how a check gets skipped.
+This applies when the project is a Keshet builder app (the `auto-deployment` plugin is installed). When the user says "deploy", "publish", "ship it", "put it live", or "share it with the team", the deploy chain runs - they never have to name an agent. Load the `deploying-your-app` skill (from the plugin) and follow it: it owns the order of the checks, asks the user the few questions that are theirs all at once at the start, runs the checks without stopping for approval, and sends only after every check has approved. Do not run the checks from memory and do not keep a second copy of the order here - a copy drifts, and a chain assembled from memory is how a check gets skipped.
 
 There is no `git push` to Keshet and there is no GitHub. **The deployment service is the only way code reaches Keshet**, it can refuse, and only the verifier may hand work to it. Read the `sharing-your-work` skill (from the plugin) before sending anything, and do not improvise refusal handling.
 

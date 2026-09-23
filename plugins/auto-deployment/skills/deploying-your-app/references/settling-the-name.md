@@ -3,8 +3,9 @@
 You do this step yourself, in the main conversation. It runs on **every**
 send, after security-review and before the verifier, and it is recorded in the
 run record under the key `create-repo`. The key is historical: this step never
-creates a repo. It agrees the app's name with the builder, writes it into the
-deployment request, and confirms the request is complete.
+creates a repo. It checks that the name the builder approved at the intake is
+written into the deployment request, and that the request is complete. It
+asks the builder nothing.
 
 The app's home at Keshet is created by Keshet itself, in one operation with
 the send, and only the verifier may ask for that. There is no git remote, no
@@ -26,37 +27,27 @@ you do based on an answer either of you assumed.
 
 So the job is the same every time: the app must have a name the builder has
 approved, written into `DEPLOY_REQUEST.md`, and the rest of the request must be
-complete. If the name is already there and the builder already agreed it, say
-so in a sentence and move on - a confirmed name is a finished job, not a
-question to ask again.
+complete. The builder approved the name at the intake (step 0), so this step
+checks it is written down and moves on. It never asks again - a confirmed name
+is a finished job, not a question to repeat.
 
-If the app's details have not been collected yet, do not improvise them. The
-step is **not approved**: re-run the deployment agent so it finishes first.
+If the app's details have not been collected yet - no intake in this run - do
+not improvise them. The step is **not approved**: go back to the intake.
 
-## 1. The name: agree it with the builder
+## 1. The name: agreed at the intake
 
-This is a conversation, not a lookup. There is nothing to call and nothing to
-run: no command on this machine can tell you whether a name will be accepted,
-and you must not pretend otherwise.
+Agreeing the name is a conversation, not a lookup, and it happens at the
+intake. There is nothing to call and nothing to run: no command on this
+machine can tell you whether a name will be accepted, and you must not
+pretend otherwise.
 
-Follow the `naming-your-app` skill - the naming rules live there - and do this:
-
-- **Propose a name.** One that fits what the app is for, taken from what the
-  builder has already told you about it.
-- **Let them answer.** They approve it, they ask you for a different one, or
-  they give you their own. All three are ordinary answers.
-- **Record what they approved.** Write the agreed name into
-  `DEPLOY_REQUEST.md` as `app-name`, then read the file again and confirm it
-  is there - the verifier reads the name from that file at send time, so a
-  name agreed in conversation and not written down does not exist.
-
-Ask plainly, in one line, for example:
-
-> "I'd call this one `sales-report`. Happy with that, or would you rather call
-> it something else?"
-
-Wait for the answer. If the conversation may end first, write the question
-into the run record's `pending` (agent `create-repo`).
+Follow the `naming-your-app` skill - the naming rules live there. At the
+intake you **propose a name** that fits what the app is for, and the builder
+approves it, asks for a different one, or gives their own - all three are
+ordinary answers. Here, check that the name they approved is in
+`DEPLOY_REQUEST.md` as `app-name`, and read the file to confirm it - the
+verifier reads the name from that file at send time, so a name agreed in
+conversation and not written down does not exist.
 
 Everything else follows from that one name - the app's address, where its
 secrets live, how it signs people in. Keshet works all of that out from the
@@ -79,10 +70,13 @@ rulebook here.
 Read `DEPLOY_REQUEST.md` and check that every field carries a real answer: the
 app name (`app-name`), the purpose, the description and tags, the data sources,
 the audience type and members, and the declared secret names (empty is a valid
-answer for secrets, and only for secrets). A `CHANGE-ME` in the purpose, data
-sources or secret names means the deployment agent has not finished - re-run
-it; in the audience, redo step 5. Never let a request Keshet will refuse
-travel further down the chain.
+answer for secrets, and only for secrets). A `CHANGE-ME` in the name,
+purpose, description, tags, data sources or audience means the intake left
+that answer out: settle that one field the intake's way - a draft put to the
+builder as a yes-or-change, or, for the audience, the audience question -
+in a single message, then carry on. In the secret names, the deployment
+agent has not finished - re-run it. Never let a request Keshet will refuse travel further
+down the chain.
 
 The `Requester` and `Local agent sign-off` blocks are different: they are
 stamped by the platform, not filled by anyone here. Both must be present,
@@ -101,18 +95,13 @@ passing them.
 ## 3. The description and tags are real
 
 Keshet registers the app in its directory, and IT reads the deployment request
-alongside a one-line description and a few tags. The deployment agent normally
-collects both in its interview. Check the `description` and `tags` fields both
+alongside a one-line description and a few tags. You drafted both at the intake
+and the builder approved them. Check the `description` and `tags` fields both
 carry a real answer - a `CHANGE-ME` or an empty line in either fails. If one is
-missing, ask the builder now, in plain language:
-
-> "Two last things before I hand this on: a one-line description of the app,
-> the way you'd describe it in a directory of Keshet apps, and a few words that
-> tag what it's about."
-
-Write their answers into those two fields, then read the file back - the
-verifier reads them from the file at send time. Do not invent them, and do not
-pass this check without them.
+missing, never ask the builder to write it: draft it from the purpose, write it
+in, and put it to them as a yes-or-change in one line. Then read the file back -
+the verifier reads them from the file at send time. Do not pass this check
+without them.
 
 In this step you write only `app-name`, `description` and `tags`. Nothing else
 in the file.
@@ -145,8 +134,8 @@ approved**. Fail closed; never guess a refusal into a success.
 
 ## Fail closed
 
-If any check cannot be completed - the builder is not there to agree a name,
-the deployment request will not read, the name cannot be confirmed in the file
+If any check cannot be completed - no name from the intake is recorded, the
+deployment request will not read, the name cannot be confirmed in the file
 after writing - the step is **not approved**, stated plainly, with what
 stopped you and what would unblock it. Never "the name is probably fine".
 

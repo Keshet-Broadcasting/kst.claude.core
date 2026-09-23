@@ -16,14 +16,18 @@
 // until Keshet has an answer.
 //
 // Usage:
-//   node send-deploy.mjs [--signoff FILE] [APP_DIR]
+//   node send-deploy.mjs [--check | --signin] [--signoff FILE] [APP_DIR]
 //
 //   APP_DIR         the app's folder (default: the current directory)
 //   --signoff FILE  the verifier's sign-off record, a JSON file kept OUTSIDE
 //                   the app folder so it never becomes part of the sent tree
+//   --check         only check that Keshet's deployment service is reachable
+//   --signin        only sign the builder in and keep the sign-in, so the
+//                   send at the end of the deploy chain needs no code
 //
 // Exit codes (the verifier acts on these):
 //   0  accepted - the deployment run reached IT review or beyond
+//      (with --check: reachable; with --signin: signed in)
 //   1  could not run - bad input, a missing tool, or an incomplete request
 //   2  refused - Keshet turned the request down; the reason was printed
 //   3  unreachable - network or service trouble; safe to run again
@@ -112,6 +116,9 @@ let signoffFile = '';
 // this network, and exit. Run at the start of the deploy chain so a missing
 // VPN is found before any check runs, not after all of them.
 let checkOnly = false;
+// --signin: sign the builder in and exit. The deploy chain runs it at its
+// start, so the send at its end reuses the kept sign-in instead of a code.
+let signinOnly = false;
 {
   const args = process.argv.slice(2);
   for (let i = 0; i < args.length; i++) {
@@ -121,8 +128,10 @@ let checkOnly = false;
       signoffFile = args[++i];
     } else if (a === '--check') {
       checkOnly = true;
+    } else if (a === '--signin') {
+      signinOnly = true;
     } else if (a.startsWith('--')) {
-      fail(EXIT_LOCAL, `Unknown option: ${a}. Usage: send-deploy.mjs [--check] [--signoff FILE] [APP_DIR]`);
+      fail(EXIT_LOCAL, `Unknown option: ${a}. Usage: send-deploy.mjs [--check | --signin] [--signoff FILE] [APP_DIR]`);
     } else {
       appDir = a;
     }
@@ -132,10 +141,11 @@ let checkOnly = false;
 const isDir = (p) => { try { return lstatSync(p).isDirectory(); } catch { return false; } };
 const isFile = (p) => { try { return lstatSync(p).isFile(); } catch { return false; } };
 
-if (!checkOnly && !isDir(appDir)) fail(EXIT_LOCAL, 'The app folder was not found, so nothing was sent.');
+const readsApp = !checkOnly && !signinOnly;
+if (readsApp && !isDir(appDir)) fail(EXIT_LOCAL, 'The app folder was not found, so nothing was sent.');
 appDir = resolve(appDir);
 const reqFile = join(appDir, 'DEPLOY_REQUEST.md');
-if (!checkOnly && !isFile(reqFile)) {
+if (readsApp && !isFile(reqFile)) {
   fail(EXIT_LOCAL,
     'The deployment request file is missing from the app folder, so nothing was sent. The deployment details need collecting before the app can go to Keshet.');
 }
@@ -196,6 +206,8 @@ const DEVICE_CODE_PATH = '/api/apps/auth/device-code';
 const DEVICE_TOKEN_PATH = '/api/apps/auth/device-token';
 const SEND_PATH = '/api/apps';
 const REFRESH_PATH = '/api/apps/auth/refresh';
+// Seconds the send's own upload may take before it counts as unanswered.
+const SEND_TIMEOUT = 900;
 
 const jstr = (obj, key) => {
   const v = obj?.[key];
@@ -203,6 +215,175 @@ const jstr = (obj, key) => {
 };
 
 const sleep = (s) => new Promise((r) => setTimeout(r, s * 1000));
+
+// --------------------------------------------------------------------------
+// The sign-in cache: ~/.kst-auth/deploy-tokens-<host>.json, owner-only.
+// Holds the access token, its expiry, the renewal token, and the account's
+// name and sign-in address. The tokens are never printed.
+// --------------------------------------------------------------------------
+const CACHE_DIR = process.env.KST_AUTH_TOKEN_CACHE_DIR || join(homedir(), '.kst-auth');
+let baseHost = '';
+try { baseHost = new URL(BASE_URL).host; } catch {
+  fail(EXIT_LOCAL, `The address of Keshet's deployment service is not a web address (${BASE_URL}), so nothing was sent. That is a platform problem to report, not something the builder did.`);
+}
+const CACHE_FILE = join(CACHE_DIR, `deploy-tokens-${baseHost.replace(/[^a-z0-9.-]/gi, '_')}.json`);
+
+const readCache = () => {
+  try { return JSON.parse(readFileSync(CACHE_FILE, 'utf8')); } catch { return null; }
+};
+
+// Saves a sign-in answer and returns { accessToken, displayName, username }.
+// `prev` is the record a renewal replaces, so a renewal that omits a field
+// keeps the old value; a fresh sign-in passes null and inherits nothing.
+const saveSignIn = (json, prev) => {
+  const now = Math.floor(Date.now() / 1000);
+  const expiresIn = Number(json?.expiresIn) || 3600;
+  const record = {
+    accessToken: jstr(json, 'accessToken'),
+    refreshToken: jstr(json, 'refreshToken') || (prev?.refreshToken ?? ''),
+    expiresAt: now + expiresIn,
+    displayName: jstr(json, 'displayName') || (prev?.displayName ?? ''),
+    username: jstr(json, 'username') || (prev?.username ?? ''),
+  };
+  try {
+    mkdirSync(CACHE_DIR, { recursive: true, mode: 0o700 });
+    writeFileSync(CACHE_FILE, JSON.stringify(record), { mode: 0o600 });
+  } catch {
+    // A cache that cannot be written only means the next attempt signs in again.
+  }
+  return { accessToken: record.accessToken, displayName: record.displayName, username: record.username };
+};
+
+const forgetSignIn = () => { try { unlinkSync(CACHE_FILE); } catch { /* already gone */ } };
+
+// Returns { accessToken, displayName, username } or null. An access token
+// with less than `minLifetime` seconds left is renewed silently, once; so is
+// a record kept before the sign-in address was, so the address arrives. A
+// renewal Keshet refuses falls through to a fresh device sign-in; one it
+// could not answer keeps the kept sign-in for the next attempt and stops.
+const loadSignIn = async (minLifetime) => {
+  const c = readCache();
+  if (c === null || typeof c.accessToken !== 'string') return null;
+  const now = Math.floor(Date.now() / 1000);
+  if (c.accessToken !== '' && Number(c.expiresAt) - now > minLifetime && typeof c.username === 'string') {
+    return { accessToken: c.accessToken, displayName: c.displayName || '', username: c.username };
+  }
+  if (typeof c.refreshToken === 'string' && c.refreshToken !== '') {
+    const r = await http('POST', REFRESH_PATH, JSON.stringify({ refreshToken: c.refreshToken }), 30);
+    if (r.ok && jstr(r.json, 'accessToken') !== '') return saveSignIn(r.json, c);
+    if (!r.reached || r.status >= 500) {
+      fail(EXIT_UNREACHABLE,
+        `Keshet could not renew the sign-in just now. Nothing is lost and the sign-in is kept - it is safe to run this again in a few minutes. ${detail(REFRESH_PATH, r.status)}`);
+    }
+  }
+  forgetSignIn();
+  return null;
+};
+
+// "Dana Cohen (dana.cohen@...)" - the sign-in address is what the deploy
+// chain records when the builder says the app is for them alone.
+const accountLabel = ({ displayName, username }) =>
+  displayName && username ? `${displayName} (${username})` : (displayName || username || 'the builder');
+
+// --------------------------------------------------------------------------
+// Sign the builder in: the kept sign-in while it holds or can be renewed
+// silently, otherwise a device sign-in through the service's own endpoints.
+// The deploy chain runs this once at its start (--signin), while the builder
+// answers its questions, so the send at the end needs no code. `minLifetime`
+// is how long, in seconds, a kept access token must still last to be used
+// as it is. Returns { accessToken, displayName, username }; a failure exits
+// with the send's own exit codes. IIS (http.sys) rejects body-less POSTs with
+// HTTP 411, so the device-code start sends an empty JSON body.
+// --------------------------------------------------------------------------
+const signIn = async (minLifetime) => {
+  const cached = await loadSignIn(minLifetime);
+  if (cached !== null) {
+    say(`Still signed in as ${accountLabel(cached)} - no new sign-in needed.`);
+    return cached;
+  }
+  say('Keshet needs the builder to sign in.');
+  const start = await http('POST', DEVICE_CODE_PATH, '{}', 30);
+  if (!start.reached) {
+    fail(EXIT_UNREACHABLE,
+      `The connection to Keshet ${start.timedOut ? 'timed out' : 'dropped'} while starting the sign-in. It is safe to run the send again. ${detail(DEVICE_CODE_PATH, 0)}`);
+  }
+  if (start.status >= 400 && start.status < 500) {
+    // 404/405/410 is the wrong-instance signature: something is listening and
+    // it is not this API, or it is a build from before device sign-in existed.
+    const noEndpoint = [404, 405, 410].includes(start.status);
+    fail(EXIT_SIGNIN, noEndpoint
+      ? `Keshet answered, but there is no sign-in at the address the send is using, so the sign-in never started. Either the send is pointed at the wrong service or that service is too old to have it. Nothing was sent. ${detail(DEVICE_CODE_PATH, start.status)}`
+      : `Keshet turned down the request to start the sign-in, so no code was issued. This is not something the builder did - it needs the platform team. Nothing was sent. ${detail(DEVICE_CODE_PATH, start.status, jstr(start.json, 'code'))}`);
+  }
+  if (!start.ok) {
+    fail(EXIT_UNREACHABLE,
+      `Keshet's deployment service answered but could not start the sign-in - the trouble is on the service's side, not the network's and not the builder's. It is safe to run the send again in a few minutes. ${detail(DEVICE_CODE_PATH, start.status)}`);
+  }
+  if (start.json === null) {
+    fail(EXIT_UNREACHABLE,
+      `Keshet's deployment service accepted the sign-in request and then answered with ${start.empty ? 'nothing at all' : 'something that was not its usual answer'}, which is what a service restarting mid-request looks like. It is safe to run the send again in a few minutes. ${detail(DEVICE_CODE_PATH, start.status)}`);
+  }
+  const deviceCode = jstr(start.json, 'deviceCode');
+  if (deviceCode === '') {
+    fail(EXIT_SIGNIN,
+      `Keshet answered the sign-in request, but its answer carried no sign-in code, so there is nothing for the builder to enter. This is not something the builder did - it needs the platform team. ${detail(DEVICE_CODE_PATH, start.status)}`);
+  }
+  const userCode = jstr(start.json, 'userCode');
+  const verificationUri = jstr(start.json, 'verificationUri');
+  const interval = Number(start.json?.interval) || 5;
+  const expiresIn = Number(start.json?.expiresIn) || 900;
+
+  say('');
+  say(`To sign in, open this address in a browser:  ${verificationUri}`);
+  say(`and enter this code:  ${userCode}`);
+  say('It is the same Keshet account used for everything else. Approve the Authenticator prompt if one appears.');
+  say('Waiting for the sign-in to finish...');
+
+  // The wait must never fall silent: a heartbeat shows the sign-in window is
+  // still open, and a run of failed polls is said out loud instead of being
+  // indistinguishable from a builder who has not signed in yet.
+  const deadline = Date.now() + expiresIn * 1000;
+  let lastHeartbeat = Date.now();
+  let pollErrors = 0;
+  while (Date.now() < deadline) {
+    await sleep(interval);
+    const now = Date.now();
+    if (now - lastHeartbeat >= 30000) {
+      const minutesLeft = Math.ceil((deadline - now) / 60000);
+      say(`Still waiting for the sign-in - about ${minutesLeft} minute(s) left on this code.`);
+      lastHeartbeat = now;
+    }
+    const poll = await http('POST', DEVICE_TOKEN_PATH, JSON.stringify({ deviceCode }), 30);
+    // The service reports both waiting and refusal in the body, so a non-2xx
+    // that still carries a body is an answer to read, not a failure to retry.
+    if (!poll.reached || (!poll.ok && poll.json === null)) {
+      pollErrors += 1;
+      if (pollErrors === 6) {
+        say(`Having trouble getting an answer from Keshet while waiting for the sign-in - still trying. If this keeps up, the problem is the connection or the service, not the sign-in. ${detail(DEVICE_TOKEN_PATH, poll.status)}`);
+      }
+      continue;
+    }
+    pollErrors = 0;
+    const status = jstr(poll.json, 'status');
+    if (status === 'authenticated') {
+      const fresh = saveSignIn(poll.json, null);
+      say(`Signed in as ${accountLabel(fresh)}.`);
+      return fresh;
+    }
+    if (status === 'pending') continue;
+    if (jstr(poll.json, 'code') !== '') {
+      fail(EXIT_SIGNIN,
+        `The sign-in did not complete. Nothing is lost - run the send again for a fresh code. ${detail(DEVICE_TOKEN_PATH, poll.status, jstr(poll.json, 'code'))}`);
+    }
+    if (!poll.ok) {
+      fail(EXIT_SIGNIN,
+        `Keshet turned down the check on the sign-in, so it cannot finish. Nothing is lost - run the send again for a fresh code. ${detail(DEVICE_TOKEN_PATH, poll.status)}`);
+    }
+  }
+  fail(EXIT_SIGNIN,
+    'The sign-in code expired before it was used. Nothing is lost - run the send again for a fresh code.');
+};
+
 
 // --------------------------------------------------------------------------
 // Check mode: reachability only. Everything below this point reads the app.
@@ -221,6 +402,15 @@ const probeService = async () => {
 if (checkOnly) {
   await probeService();
   say(`Keshet's deployment service is reachable at ${BASE_URL}.`);
+  process.exit(0);
+}
+
+// --signin: sign the builder in and keep the sign-in, then exit. Nothing
+// about the app is read or sent.
+if (signinOnly) {
+  say(`Checking that Keshet's deployment service is reachable at ${BASE_URL}...`);
+  await probeService();
+  await signIn(60);
   process.exit(0);
 }
 
@@ -579,172 +769,21 @@ const accepted = () => {
 // --------------------------------------------------------------------------
 // The send itself, from reachability to Keshet's final answer
 // --------------------------------------------------------------------------
-// --------------------------------------------------------------------------
-// The sign-in cache: ~/.kst-auth/deploy-tokens-<host>.json, owner-only.
-// Holds the access token, its expiry, and the renewal token. Never printed.
-// --------------------------------------------------------------------------
-const CACHE_DIR = process.env.KST_AUTH_TOKEN_CACHE_DIR || join(homedir(), '.kst-auth');
-const CACHE_FILE = join(CACHE_DIR, `deploy-tokens-${new URL(BASE_URL).host.replace(/[^a-z0-9.-]/gi, '_')}.json`);
-
-const readCache = () => {
-  try { return JSON.parse(readFileSync(CACHE_FILE, 'utf8')); } catch { return null; }
-};
-
-const saveSignIn = (json, displayName) => {
-  const prev = readCache();
-  const now = Math.floor(Date.now() / 1000);
-  const expiresIn = Number(json?.expiresIn) || 3600;
-  const record = {
-    accessToken: jstr(json, 'accessToken'),
-    refreshToken: jstr(json, 'refreshToken') || (prev?.refreshToken ?? ''),
-    expiresAt: now + expiresIn,
-    displayName: displayName || (prev?.displayName ?? ''),
-  };
-  try {
-    mkdirSync(CACHE_DIR, { recursive: true, mode: 0o700 });
-    writeFileSync(CACHE_FILE, JSON.stringify(record), { mode: 0o600 });
-  } catch {
-    // A cache that cannot be written only means the next attempt signs in again.
-  }
-};
-
-const forgetSignIn = () => { try { unlinkSync(CACHE_FILE); } catch { /* already gone */ } };
-
-// Returns { accessToken, displayName } or null. Silent renewal is attempted
-// once; any failure falls through to a fresh device sign-in.
-const loadSignIn = async () => {
-  const c = readCache();
-  if (c === null || typeof c.accessToken !== 'string') return null;
-  const now = Math.floor(Date.now() / 1000);
-  if (c.accessToken !== '' && Number(c.expiresAt) - now > 60) {
-    return { accessToken: c.accessToken, displayName: c.displayName || '' };
-  }
-  if (typeof c.refreshToken === 'string' && c.refreshToken !== '') {
-    const r = await http('POST', REFRESH_PATH, JSON.stringify({ refreshToken: c.refreshToken }), 30);
-    if (r.ok && jstr(r.json, 'accessToken') !== '') {
-      saveSignIn(r.json, c.displayName || '');
-      return { accessToken: jstr(r.json, 'accessToken'), displayName: c.displayName || '' };
-    }
-  }
-  forgetSignIn();
-  return null;
-};
-
 const main = async () => {
   say(`Checking that Keshet's deployment service is reachable at ${BASE_URL}...`);
   // A service that answers anything is reachable; an unhealthy answer is
   // said out loud and the sign-in that follows explains itself properly.
   await probeService();
 
-  // ------------------------------------------------------------------------
-  // Sign the builder in (device sign-in via the service's own endpoints).
-  // IIS (http.sys) rejects body-less POSTs with HTTP 411, so send an empty
-  // JSON body even though the endpoint takes no input.
-  // ------------------------------------------------------------------------
-  let token = '';
-  let builderName = 'the builder';
-  // A sign-in from a previous attempt is reused while it lasts, and renewed
-  // silently while the renewal token lasts - a failed send must not cost the
-  // builder another code. Same file layout as scripts/device-login.sh.
-  const cached = await loadSignIn();
-  if (cached !== null) {
-    token = cached.accessToken;
-    builderName = cached.displayName || builderName;
-    say(`Still signed in as ${builderName} from the previous attempt.`);
-  }
-  if (token === '') {
-  say('Keshet needs the builder to sign in before the app can be sent.');
-  const start = await http('POST', DEVICE_CODE_PATH, '{}', 30);
-  if (!start.reached) {
-    fail(EXIT_UNREACHABLE,
-      `The connection to Keshet ${start.timedOut ? 'timed out' : 'dropped'} while starting the sign-in. It is safe to run the send again. ${detail(DEVICE_CODE_PATH, 0)}`);
-  }
-  if (start.status >= 400 && start.status < 500) {
-    // 404/405/410 is the wrong-instance signature: something is listening and
-    // it is not this API, or it is a build from before device sign-in existed.
-    const noEndpoint = [404, 405, 410].includes(start.status);
-    fail(EXIT_SIGNIN, noEndpoint
-      ? `Keshet answered, but there is no sign-in at the address the send is using, so the sign-in never started. Either the send is pointed at the wrong service or that service is too old to have it. Nothing was sent. ${detail(DEVICE_CODE_PATH, start.status)}`
-      : `Keshet turned down the request to start the sign-in, so no code was issued. This is not something the builder did - it needs the platform team. Nothing was sent. ${detail(DEVICE_CODE_PATH, start.status, jstr(start.json, 'code'))}`);
-  }
-  if (!start.ok) {
-    fail(EXIT_UNREACHABLE,
-      `Keshet's deployment service answered but could not start the sign-in - the trouble is on the service's side, not the network's and not the builder's. It is safe to run the send again in a few minutes. ${detail(DEVICE_CODE_PATH, start.status)}`);
-  }
-  if (start.json === null) {
-    fail(EXIT_UNREACHABLE,
-      `Keshet's deployment service accepted the sign-in request and then answered with ${start.empty ? 'nothing at all' : 'something that was not its usual answer'}, which is what a service restarting mid-request looks like. It is safe to run the send again in a few minutes. ${detail(DEVICE_CODE_PATH, start.status)}`);
-  }
-  const deviceCode = jstr(start.json, 'deviceCode');
-  if (deviceCode === '') {
-    fail(EXIT_SIGNIN,
-      `Keshet answered the sign-in request, but its answer carried no sign-in code, so there is nothing for the builder to enter. This is not something the builder did - it needs the platform team. ${detail(DEVICE_CODE_PATH, start.status)}`);
-  }
-  const userCode = jstr(start.json, 'userCode');
-  const verificationUri = jstr(start.json, 'verificationUri');
-  const interval = Number(start.json?.interval) || 5;
-  const expiresIn = Number(start.json?.expiresIn) || 900;
-
-  say('');
-  say(`To sign in, open this address in a browser:  ${verificationUri}`);
-  say(`and enter this code:  ${userCode}`);
-  say('It is the same Keshet account used for everything else. Approve the Authenticator prompt if one appears.');
-  say('Waiting for the sign-in to finish...');
-
-  // The wait must never fall silent: a heartbeat shows the sign-in window is
-  // still open, and a run of failed polls is said out loud instead of being
-  // indistinguishable from a builder who has not signed in yet.
-  const deadline = Date.now() + expiresIn * 1000;
-  let lastHeartbeat = Date.now();
-  let pollErrors = 0;
-  while (Date.now() < deadline) {
-    await sleep(interval);
-    const now = Date.now();
-    if (now - lastHeartbeat >= 30000) {
-      const minutesLeft = Math.ceil((deadline - now) / 60000);
-      say(`Still waiting for the sign-in - about ${minutesLeft} minute(s) left on this code.`);
-      lastHeartbeat = now;
-    }
-    const poll = await http('POST', DEVICE_TOKEN_PATH, JSON.stringify({ deviceCode }), 30);
-    // The service reports both waiting and refusal in the body, so a non-2xx
-    // that still carries a body is an answer to read, not a failure to retry.
-    if (!poll.reached || (!poll.ok && poll.json === null)) {
-      pollErrors += 1;
-      if (pollErrors === 6) {
-        say(`Having trouble getting an answer from Keshet while waiting for the sign-in - still trying. If this keeps up, the problem is the connection or the service, not the sign-in. ${detail(DEVICE_TOKEN_PATH, poll.status)}`);
-      }
-      continue;
-    }
-    pollErrors = 0;
-    const status = jstr(poll.json, 'status');
-    if (status === 'authenticated') {
-      token = jstr(poll.json, 'accessToken');
-      builderName = jstr(poll.json, 'displayName') || jstr(poll.json, 'username') || 'the builder';
-      saveSignIn(poll.json, builderName);
-      break;
-    }
-    if (status === 'pending') continue;
-    if (jstr(poll.json, 'code') !== '') {
-      fail(EXIT_SIGNIN,
-        `The sign-in did not complete. Nothing is lost - run the send again for a fresh code. ${detail(DEVICE_TOKEN_PATH, poll.status, jstr(poll.json, 'code'))}`);
-    }
-    if (!poll.ok) {
-      fail(EXIT_SIGNIN,
-        `Keshet turned down the check on the sign-in, so it cannot finish. Nothing is lost - run the send again for a fresh code. ${detail(DEVICE_TOKEN_PATH, poll.status)}`);
-    }
-  }
-  if (token === '') {
-    fail(EXIT_SIGNIN,
-      'The sign-in code expired before it was used. Nothing is lost - run the send again for a fresh code.');
-  }
-  say(`Signed in as ${builderName}.`);
-  }
+  // The token must outlast the upload and the run-following below; one that
+  // lapsed halfway would read as a failed send after Keshet took the app.
+  const { accessToken: token } = await signIn(SEND_TIMEOUT + POLL_COUNT * POLL_INTERVAL + 60);
 
   // ------------------------------------------------------------------------
   // Send, then follow the run until Keshet has an answer
   // ------------------------------------------------------------------------
   say('Sending the app to Keshet now. This can take a few minutes...');
-  const sent = await http('POST', SEND_PATH, JSON.stringify(payload), 900, token);
+  const sent = await http('POST', SEND_PATH, JSON.stringify(payload), SEND_TIMEOUT, token);
   if (!sent.reached) {
     fail(EXIT_UNREACHABLE,
       `The connection to Keshet ${sent.timedOut ? 'timed out' : 'dropped'} while sending. It is safe to run the send again - the identical app sent twice is recognised as the same request. ${detail(SEND_PATH, 0)}`);

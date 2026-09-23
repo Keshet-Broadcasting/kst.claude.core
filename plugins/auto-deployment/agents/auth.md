@@ -40,7 +40,7 @@ Fails:
 
 Passes: the user's token forwarded per request, and a refusal from the source surfaced to that user as a plain message - "you don't have access to this data - ask the person who owns it" - with the technical detail going to the log, never to the screen.
 
-One nuance, so you do not over-correct: a genuinely user-independent call can use an app-level credential - a text-generation API where the key meters usage and guards no user data, for instance. The test is whether the source holds data that individual users are separately authorized for. If it does, the user's token goes with the call, no exceptions. If you are unsure which kind a source is, ask the builder what lives behind it, in their words, and decide from the answer - or fail closed.
+One nuance, so you do not over-correct: a genuinely user-independent call can use an app-level credential - a text-generation API where the key meters usage and guards no user data, for instance. The test is whether the source holds data that individual users are separately authorized for. If it does, the user's token goes with the call, no exceptions. If you are unsure which kind a source is, decide from what the builder said it holds at the start of the run - the orchestrator passes it to you with the data sources. Only if that does not settle it, return one question asking what lives behind it, in their words - or fail closed.
 
 ### 3. Wire what is missing
 

@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -393,7 +393,7 @@ describe('send-deploy.mjs check mode, sign-in cache, and 413', () => {
   });
 
   type Counts = { deviceCode: number; refresh: number; send: number };
-  const startRichApi = async (sendStatus: number): Promise<{ baseUrl: string; counts: Counts }> => {
+  const startRichApi = async (sendStatus: number, tokenLifetime = 3600, refreshStatus = 200): Promise<{ baseUrl: string; counts: Counts }> => {
     const counts: Counts = { deviceCode: 0, refresh: 0, send: 0 };
     const server = createServer((req: IncomingMessage, res: ServerResponse) => {
       const reply = (status: number, body: string) => {
@@ -406,11 +406,12 @@ describe('send-deploy.mjs check mode, sign-in cache, and 413', () => {
         return reply(200, '{"deviceCode":"d1","userCode":"CODE1","verificationUri":"https://example.test/device","interval":1,"expiresIn":60}');
       }
       if (req.url === '/api/apps/auth/device-token') {
-        return reply(200, '{"status":"authenticated","accessToken":"at-1","refreshToken":"rt-1","expiresIn":3600,"displayName":"Probe"}');
+        return reply(200, `{"status":"authenticated","accessToken":"at-1","refreshToken":"rt-1","expiresIn":${tokenLifetime},"displayName":"Probe","username":"probe@example.com"}`);
       }
       if (req.url === '/api/apps/auth/refresh') {
         counts.refresh += 1;
-        return reply(200, '{"accessToken":"at-2","refreshToken":"rt-2","expiresIn":3600}');
+        if (refreshStatus !== 200) return reply(refreshStatus, '{"message":"unavailable"}');
+        return reply(200, '{"status":"authenticated","accessToken":"at-2","refreshToken":"rt-2","expiresIn":3600,"displayName":"Probe","username":"probe@example.com"}');
       }
       if (req.url === '/api/apps') {
         counts.send += 1;
@@ -469,6 +470,111 @@ describe('send-deploy.mjs check mode, sign-in cache, and 413', () => {
     expect(counts.deviceCode).toBe(1);
     expect(second.stdout).toContain('Still signed in');
     expect(counts.send).toBe(2);
+  }, 30_000);
+
+  // The deploy chain signs the builder in at its start, while they answer the
+  // intake questions, and sends at its end. --signin is that first half.
+  const appFolder = () => {
+    const dir = mkdtempSync(join(tmpdir(), 'send-deploy-test-'));
+    dirs.push(dir);
+    writeFileSync(join(dir, 'DEPLOY_REQUEST.md'), filledTemplate());
+    mkdirSync(join(dir, '.kst'), { recursive: true });
+    writeFileSync(join(dir, '.kst', 'app-spec.md'), filledSpec());
+    writeFileSync(join(dir, 'package.json'), '{}');
+    return dir;
+  };
+
+  it('--signin signs in, names the account with its address, and sends nothing', async () => {
+    const { baseUrl, counts } = await startRichApi(500);
+    const dir = mkdtempSync(join(tmpdir(), 'send-deploy-test-'));
+    dirs.push(dir);
+    const run = await runWith(dir, baseUrl, join(dir, 'cache'), ['--signin']);
+    expect(run.status).toBe(0);
+    expect(run.stdout).toContain('CODE1');
+    expect(run.stdout).toContain('Signed in as Probe (probe@example.com)');
+    expect(counts.deviceCode).toBe(1);
+    expect(counts.send).toBe(0);
+  }, 30_000);
+
+  it('--signin reuses a sign-in that is still good and asks for no code', async () => {
+    const { baseUrl, counts } = await startRichApi(500);
+    const dir = mkdtempSync(join(tmpdir(), 'send-deploy-test-'));
+    dirs.push(dir);
+    const cache = join(dir, 'cache');
+    await runWith(dir, baseUrl, cache, ['--signin']);
+    const again = await runWith(dir, baseUrl, cache, ['--signin']);
+    expect(again.status).toBe(0);
+    expect(again.stdout).toContain('Still signed in as Probe (probe@example.com)');
+    expect(again.stdout).not.toContain('CODE1');
+    expect(counts.deviceCode).toBe(1);
+  }, 30_000);
+
+  it('a send after --signin asks for no code', async () => {
+    const { baseUrl, counts } = await startRichApi(500);
+    const dir = appFolder();
+    const cache = join(dir, 'cache');
+    await runWith(dir, baseUrl, cache, ['--signin']);
+    const send = await runWith(dir, baseUrl, cache);
+    expect(send.stdout).not.toContain('CODE1');
+    expect(send.stdout).toContain('Still signed in');
+    expect(counts.deviceCode).toBe(1);
+    expect(counts.send).toBe(1);
+  }, 30_000);
+
+  it('a send after the access token expired renews it silently instead of asking for a code', async () => {
+    const { baseUrl, counts } = await startRichApi(500, 1);
+    const dir = appFolder();
+    const cache = join(dir, 'cache');
+    await runWith(dir, baseUrl, cache, ['--signin']);
+    const send = await runWith(dir, baseUrl, cache);
+    expect(send.stdout).not.toContain('CODE1');
+    expect(counts.refresh).toBe(1);
+    expect(counts.deviceCode).toBe(1);
+    expect(counts.send).toBe(1);
+  }, 30_000);
+
+  it('a send renews a token that would lapse during the upload, and --signin does not', async () => {
+    const { baseUrl, counts } = await startRichApi(500, 600);
+    const dir = appFolder();
+    const cache = join(dir, 'cache');
+    await runWith(dir, baseUrl, cache, ['--signin']);
+    const again = await runWith(dir, baseUrl, cache, ['--signin']);
+    expect(again.stdout).toContain('Still signed in');
+    expect(counts.refresh).toBe(0);
+    const send = await runWith(dir, baseUrl, cache);
+    expect(send.stdout).not.toContain('CODE1');
+    expect(counts.refresh).toBe(1);
+    expect(counts.send).toBe(1);
+  }, 30_000);
+
+  it('a renewal the service could not answer keeps the sign-in and asks for no code', async () => {
+    const { baseUrl, counts } = await startRichApi(500, 1, 503);
+    const dir = appFolder();
+    const cache = join(dir, 'cache');
+    await runWith(dir, baseUrl, cache, ['--signin']);
+    const send = await runWith(dir, baseUrl, cache);
+    expect(send.status).toBe(EXIT_UNREACHABLE);
+    expect(send.stdout).not.toContain('CODE1');
+    expect(counts.deviceCode).toBe(1);
+    expect(counts.send).toBe(0);
+    expect(readdirSync(cache)).toHaveLength(1);
+  }, 30_000);
+
+  it('renews a sign-in kept before the address was, so --signin can name the address', async () => {
+    const { baseUrl, counts } = await startRichApi(500);
+    const dir = mkdtempSync(join(tmpdir(), 'send-deploy-test-'));
+    dirs.push(dir);
+    const cache = join(dir, 'cache');
+    mkdirSync(cache);
+    const host = new URL(baseUrl).host.replace(/[^a-z0-9.-]/gi, '_');
+    writeFileSync(join(cache, `deploy-tokens-${host}.json`), JSON.stringify({
+      accessToken: 'old', refreshToken: 'rt-0', expiresAt: Math.floor(Date.now() / 1000) + 3000, displayName: 'Probe',
+    }));
+    const run = await runWith(dir, baseUrl, cache, ['--signin']);
+    expect(run.status).toBe(0);
+    expect(run.stdout).toContain('Still signed in as Probe (probe@example.com)');
+    expect(counts.refresh).toBe(1);
+    expect(counts.deviceCode).toBe(0);
   }, 30_000);
 
   it('names a 413 as a platform-side limit, not the builder\'s app', async () => {
