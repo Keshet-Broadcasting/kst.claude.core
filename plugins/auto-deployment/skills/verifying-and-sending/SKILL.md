@@ -1,6 +1,6 @@
 ---
 name: verifying-and-sending
-description: The last step of the deploy chain, loaded by the deploying-your-app skill and only by it, after every check agent has reported into the run record. You confirm that every required check ran and approved against the code as it stands right now, that the deployment details are complete enough for IT to review, emit the sign-off record, and run the send tooling in this conversation so the builder sees the sign-in address and code the moment they appear. It is the only thing that ever contacts the Keshet deployment service, and the deploy request is the only thing ever sent to it. V:0.1.15
+description: The last step of the deploy chain, loaded by the deploying-your-app skill and only by it, after every check agent has reported into the run record. You confirm that every required check ran and approved against the code as it stands right now, that the deployment details are complete enough for IT to review, emit the sign-off record, and run the send tooling in this conversation so the builder sees the sign-in address and code the moment they appear. It is the only thing that ever sends anything to the Keshet deployment service (the intake's sign-in sends nothing of the app), and the deploy request is the only thing ever sent to it. V:0.1.16
 ---
 
 # Verifying and sending - you are the verifier
@@ -38,8 +38,9 @@ probably passed" is the exact failure you exist to prevent.
 
 ## Why this runs here and not in a sub-agent
 
-The send signs the builder in with a device code: the tooling prints a web
-address and a short code and waits. A sub-agent's output is not visible to
+The send reuses the sign-in the intake made, but when that has lapsed it
+signs the builder in with a device code: the tooling prints a web address
+and a short code and waits. A sub-agent's output is not visible to
 the builder while it runs, so a code printed there is relayed late or not at
 all, expires, and costs another sign-in. That is why this step is a skill
 you follow in the main conversation: you run the tooling, you see the code
@@ -128,19 +129,11 @@ Before anything is sent, check every one of these is present and real:
   builds and then breaks the first time someone opens it.
 - **Description and tags** - the catalogue entry IT registers the app
   under, in the file's `description` and `tags` fields like everything
-  else here. The deployment agent writes them during its interview. A
-  `CHANGE-ME` or an empty line in either fails this check. If missing, ask
-  the builder directly, in their language:
-
-> "One last thing before I send it. IT lists every app in a catalogue, so I
-> need a one-line description of what this app does, and a few words to file
-> it under - like 'newsroom' or 'scheduling'. What should they say?"
-
-Write their answers into the request file's `description` and `tags`
-fields before sending - the form IT sees is filled from the file, so an
-answer that lives anywhere else does not reach them. Never invent these on
-their behalf, and never send placeholders hoping IT will fill the gap. The two audience-and-data decisions are the builder's
-alone; the description and tags are theirs to word.
+  else here. The intake drafts them and the builder approves them. A
+  `CHANGE-ME` or an empty line in either fails this check: that is step 7
+  unfinished, so hand back to the orchestrator to finish it there. Never
+  send placeholders hoping IT will fill the gap, and never ask the builder
+  to write them from scratch.
 
 ### The app spec agrees with the code
 
@@ -313,29 +306,33 @@ from `DEPLOY_REQUEST.md`, the file tree after the exclusions, the secret
 values from `.env` - sends it, and follows the run, printing plain-language
 progress.
 
-**Brief the builder before you launch it, never after.** Partway through,
-the tooling prints a web address and a short code and then waits for the
-builder to sign in. A builder who was not told this is coming sees a frozen
-terminal full of text and does not know the next move is theirs - and the
-code expires while they wait for you. So before running the command, say in
-your own words: "In a moment you'll be asked to sign in to Keshet. A web
-address and a short code will appear - open the address in your browser,
-type the code, and sign in with your normal Keshet account. Approve the
-phone prompt if one appears. I'll take it from there."
+**Do not ask for a go-ahead.** The builder asked to deploy; that request
+is the permission to send, and they may well have stepped away since the
+intake. Once steps 1 to 4 pass, run the send straight away - no "ready to
+send?", no summary waiting for a yes.
+
+**The builder is normally already signed in.** Read `intake.signedIn` in
+the run record. When it is `true`, the tooling reuses that sign-in and
+renews it silently, so the send prints "Still signed in as ..." and goes
+straight through - the same on a retry after a refusal, an outage or a
+missing tool. Do not tell the builder to expect a sign-in.
+
+When it is `"waiting"`, the intake's sign-in may still be running in the
+background: wait for it to end before you send, so two sign-ins never run
+at once, then send. When it is `false`, or the sign-in ended without
+signing in, the send will ask for one: tell the builder first, in one line,
+that a web address and a short code are about to appear and they should
+sign in with them straight away.
 
 **Run the send so you can watch it.** Run the command in the background and
-read its output every few seconds while it runs. The moment the address and
-code appear, say them to the builder yourself, in one short message - the
-builder should never have to fish them out of raw terminal output. If your
-environment can only run commands in the foreground, the briefing above is
-what saves the sign-in: add that the address and code will appear **in the
-terminal window itself**, and that the builder should act on them right
-away without waiting for you.
-
-**A sign-in usually is not needed at all.** The tooling keeps the previous
-sign-in and renews it silently, so a retry after a refusal, an outage or a
-missing tool prints "Still signed in as ..." and goes straight to the send.
-Only brief the builder about a code when the tooling actually prints one.
+read its output every few seconds while it runs. If the kept sign-in could
+not be renewed, the tooling prints a web address and a short code instead
+and waits: the moment they appear, say them to the builder yourself, in one
+short message - the builder should never have to fish them out of raw
+terminal output. If your environment can only run commands in the
+foreground, tell the builder before running it that a sign-in address and
+code may appear **in the terminal window itself**, and that they should act
+on them right away without waiting for you.
 
 Its exit code is the outcome, and you act on it and on nothing else:
 
@@ -361,7 +358,7 @@ the sign-in are kept, and when they hear back they say "send it again".
 On every outcome other than 0 the run record stays where it is. The
 agents' results are still true of this tree, and the next attempt - after
 a tool is installed, after Keshet is reachable again, after a refusal is
-acted on - resumes from them instead of interviewing the builder again.
+acted on - resumes from them instead of asking the builder again.
 
 ### The builder's sign-in travels with the request, never through you
 
@@ -387,8 +384,8 @@ Concretely, and with no exceptions:
   Say so plainly and stop. No way to send is a platform problem to report,
   never a gap for you to bridge with a credential of your own making.
 
-**A sign-in prompt is routine, not a failure.** On every send the tooling
-prints a web address and a short code. The builder opens the address, enters
+**A sign-in prompt is routine, not a failure.** When the kept sign-in has
+lapsed, the tooling prints a web address and a short code. The builder opens the address, enters
 the code, and signs in with their ordinary Keshet account, approving the
 phone prompt if one appears; the tooling waits and then carries on by
 itself. That is the system working normally, so present it that way. When

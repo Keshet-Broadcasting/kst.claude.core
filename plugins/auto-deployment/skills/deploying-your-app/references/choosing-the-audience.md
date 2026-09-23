@@ -1,9 +1,13 @@
 # Step 5 - choosing the audience
 
-You do this step yourself, in the main conversation. It runs after app-logging
-and before security-review, and any time the builder wants to change who can
-use the app or asks "who can see this". It is recorded in the run record under
-the key `access-manager`.
+You do this step yourself, in the main conversation. The question is asked
+once, at the intake (step 0), together with every other question of the run;
+this file holds the rules for that question and its follow-ups. Step 5 itself
+runs after app-logging and before security-review: it writes the builder's
+answer into the deployment request and checks it, and asks nothing. It is
+recorded in the run record under the key `access-manager`. If the builder
+wants to change who can use the app, or asks "who can see this", ask the
+question again then, the same way.
 
 You decide nothing here. Your whole job is to make sure the **builder** decides
 one thing, out loud, in their own words: **who may open this app.**
@@ -36,19 +40,28 @@ own sign-in through. So the audience does not need to be trimmed to "people who
 already have the data permissions" - but it also must not be widened on the
 theory that the data sources will sort it out.
 
-## How to have the conversation
+## How to ask it, at the intake
 
 Ask plainly, in words like these:
 
-> Before the app can go live, you need to decide who is allowed to open it.
-> Nobody has access until you say so - there is no default. Who should be able
-> to open this app?
+> Who should be able to open this app? Nobody can until you say - there is
+> no default.
 
-Wait for the answer. If the conversation may end first, write the question
-into the run record's `pending` (agent `access-manager`) so it is asked again
-next time.
+Offer the choices below, none of them marked as recommended:
 
-Then help them turn the answer into one of the two forms the platform accepts:
+- **Only me** - recorded as individuals, with the address the builder's
+  Keshet sign-in printed. If that is not available, their work email is the
+  one follow-up question.
+- **Specific people** - they give the Keshet work email addresses.
+- **A team group** - they name the team.
+- **Keep: ...** - only when an audience is already recorded in the
+  deployment request, shown in their words. It is their own earlier answer
+  offered back, not a default: picking it is their confirmation.
+
+If the conversation ends before they answer, nothing is recorded: the next
+run's intake asks again.
+
+Their answer has to fit one of the two forms the platform accepts:
 
 - **Named individuals** - specific people, by their Keshet work email address,
   written exactly as the builder gives it to you.
@@ -65,10 +78,9 @@ Rules for the conversation, none of them negotiable:
 - **Never pre-fill an answer.** Not "everyone", not "your team", not the people
   mentioned earlier in the chat. You may remind them who the app seems to be
   for based on its stated purpose - "you described this as a tool for the
-  newsroom schedulers" - but the naming is theirs. If the deployment
-  interview already recorded an audience, do not treat it as decided: read
-  it back and have the builder confirm or change it. The recorded audience
-  is whatever they most recently stated, confirmed here.
+  newsroom schedulers" - but the naming is theirs. An audience already in
+  the deployment request is offered back as the "Keep" choice, never kept
+  silently. The recorded audience is whatever they most recently chose.
 - **"Everyone at Keshet" must be said, not clicked.** If they answer "everyone"
   or "the whole company", do not record it yet. Reflect it back once:
   > That means every person at Keshet will be able to open this app and see
@@ -88,10 +100,16 @@ Rules for the conversation, none of them negotiable:
   > The quickest path to approval is an audience no wider than the purpose
   > needs.
 - **Changing their mind is fine.** If they widen or narrow the audience later,
-  redo this whole step. The recorded audience must always be the one they
-  most recently stated.
+  ask again and redo step 5. The recorded audience must always be the one
+  they most recently stated.
+- **One answer is enough.** Once they have chosen at the intake, step 5
+  does not read it back for another yes. Asking twice is what makes the run
+  slow, and it proves nothing the first answer did not.
 
-## Individuals: a quiet sanity pass
+## Individuals: a quiet sanity pass, at the intake
+
+Do this pass while the builder is still answering the intake, and put any
+query into its follow-ups. Step 5 never queries an address.
 
 **An individual is recorded as an email address, never as a name.** If the
 builder says "Roman Neganov", that is a person, not an address - Keshet's gate
@@ -181,7 +199,8 @@ individuals, group names for groups), and no `CHANGE-ME` remains anywhere in
 the audience section. If anything fails that read-back and you cannot correct
 it, the step is not approved.
 
-Then confirm to the builder in one sentence what you recorded:
+Then tell the builder in one sentence what you recorded - a statement, not a
+question:
 
 > Done - when the app goes live, it will open only for the newsroom-schedulers
 > group. Anyone else who tries the link won't get in.
@@ -212,6 +231,6 @@ and the members, exactly as they went into the deployment request, or "none
 recorded" with the reason - and whether the builder explicitly confirmed an
 "everyone" choice; plus one entry per problem, in the builder's language.
 
-Approved means, and only means: the builder explicitly named this audience in
-this step (or a redo of it), it is recorded in the deployment request in valid
-form, and the read-back passed.
+Approved means, and only means: the builder explicitly chose this audience at
+this run's intake (or when they changed it later), it is recorded in the
+deployment request in valid form, and the read-back passed.

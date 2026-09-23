@@ -10,7 +10,7 @@
 # hands over; send-deploy.ps1 is its Windows twin.
 #
 # Usage:
-#   send-deploy.sh [--check] [--signoff FILE] [APP_DIR]
+#   send-deploy.sh [--check | --signin] [--signoff FILE] [APP_DIR]
 #
 # Exit codes (the verifier acts on these; the .mjs owns them):
 #   0  accepted - the deployment run reached IT review or beyond

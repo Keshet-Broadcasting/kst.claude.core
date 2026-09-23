@@ -1,6 +1,6 @@
 ---
 name: definition-of-done
-description: Load before reporting that ANY piece of work is finished, and always before sending an app to Keshet. Trigger on "is it ready", "are we done", "send it", "publish", or whenever you are about to say something is complete. V:0.1.15
+description: Load before reporting that ANY piece of work is finished, and always before sending an app to Keshet. Trigger on "is it ready", "are we done", "send it", "publish", or whenever you are about to say something is complete. V:0.1.16
 ---
 
 # Definition of done
@@ -52,9 +52,9 @@ emitted its sign-off. That is the whole answer, and it is not yours to give -
 the verifier gives it.
 
 ```
-deployment → secrets-manager → auth → app-logging → choosing the audience
-                                                            ↓
-                   verifier ← settling the name ← security-review
+intake → deployment → secrets-manager → auth → app-logging → choosing the audience
+                                                                      ↓
+                             verifier ← settling the name ← security-review
 ```
 
 The verifier is the only thing that may hand work to Keshet. If it has not
