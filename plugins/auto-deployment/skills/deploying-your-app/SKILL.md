@@ -1,6 +1,6 @@
 ---
 name: deploying-your-app
-description: Load whenever the builder expresses deploy intent in any wording - "deploy", "publish", "ship it", "put it live", "share it with the team", "send it", "give them a link", or anything that means another person needs to open the app - and after any conversation that changed code, to decide which deployment checks must re-run. You then act as the orchestrator: you launch the check agents as sub-agents in a fixed order, ask the builder every question once, at the start (the intake, which also signs them in), then run the whole chain without stopping for approval, and hand the run record to the verifier, which is the only thing that ever sends. The builder never names an agent; this skill is how their intent becomes the right sequence of checks. V:0.1.16
+description: Load whenever the builder expresses deploy intent in any wording - "deploy", "publish", "ship it", "put it live", "share it with the team", "send it", "give them a link", or anything that means another person needs to open the app - and after any conversation that changed code, to decide which deployment checks must re-run. You then act as the orchestrator: you launch the check agents as sub-agents in a fixed order, ask the builder every question once, at the start (the intake, which also signs them in), then run the whole chain without stopping for approval, and hand the run record to the verifier, which is the only thing that ever sends. The builder never names an agent; this skill is how their intent becomes the right sequence of checks. V:0.1.17
 ---
 
 # Deploying your app - you are the orchestrator
@@ -143,11 +143,15 @@ Its shape:
     "deployment": {
       "verdict": "approved",
       "finishedAt": "2026-09-15T09:03:10Z",
-      "treeDigest": "<git HEAD>+<sha256 of `git status --porcelain` and the diff of uncommitted changes, both computed with DEPLOY_REQUEST.md, .env* and .kst-deploy/ left out>",
+      "treeDigest": "sha256:<the digest right after it finished>",
       "whatWasChecked": "...",
       "findings": []
     }
   },
+  "chain": [
+    { "step": "deployment", "before": "sha256:<a>", "after": "sha256:<b>" },
+    { "step": "secrets-manager", "before": "sha256:<b>", "after": "sha256:<b>" }
+  ],
   "pending": {
     "agent": "auth",
     "question": "The app reads from the finance system, but that isn't in what IT will see. Should I add it, or should the app not be reading from there?",
@@ -162,10 +166,8 @@ Its shape:
 1. Read the record if it exists. Discard it - delete the file and start
    fresh - if `startedAt` is more than 24 hours old, or if it will not
    parse. Say nothing to the builder about either.
-2. Compute the current tree digest the same way the entries do. The digest
-   leaves out `DEPLOY_REQUEST.md`, `.env*` and `.kst-deploy/`: writing the
-   request file is part of the job (deployment, secrets-manager, and your own
-   steps 5 and 7 all do), and that must not void the checks that ran before. Code changes are what stale a result.
+2. Compute the current tree digest - one command, see "Which results are
+   still current" below.
 3. If the record has no `intake` entry, this is a new run: send the opening
    message and run the intake. Intake questions are never written as
    `pending` - a run whose intake did not finish simply redoes it, offering
@@ -176,14 +178,16 @@ Its shape:
    **that agent only** with the answer, and continue the chain from the step
    after it.
 5. Otherwise, walk the chain in order. **Skip a step only when its entry
-   is `approved` and its `treeDigest` equals the current one.** Anything
-   else - missing, not-approved, a different digest - runs. Skipping is the
-   only shortcut, and it is safe because the digest proves nothing changed.
+   is `approved` and still current** (below). Anything else - missing,
+   not-approved, no longer current - runs. Skipping is the only shortcut,
+   and it is safe because the chain proves what changed since.
    The intake is not part of this walk: it ran in point 3, or it already
    ran in this run - either way, do not ask again.
 
-**After every agent returns**, write its five-field record into `agents`
-before doing anything else. If it returned a `question` - rare after an
+**Around every step**, compute the digest just before you start it and
+just after it finishes, and append one line to `chain` - the step, `before`
+and `after`. **After every agent returns**, write its five-field record into
+`agents` (with `after` as its `treeDigest`) before doing anything else. If it returned a `question` - rare after an
 intake, and only for something the code turned up that the answers did not
 cover - write that as `pending`, put the question to the builder in their
 language, and **wait for their answer**. Then write the answer, re-run that
@@ -192,9 +196,46 @@ one agent with it, and continue. Nothing before that point re-runs.
 **Steps 5 and 7 are yours**, and they get the same five-field entry, under
 the keys `access-manager` and `create-repo` (the key names are kept so the
 verifier's list and any existing record stay valid). You write the entry
-when the step is done, with the current digest. Neither asks the builder
+when the step is done, and a `chain` line like any step. Neither asks the builder
 anything: the intake settled the audience and the name, and these steps
 record and check them.
+
+### Which results are still current
+
+The digest is one command, the same on every machine:
+
+```
+node "${CLAUDE_PLUGIN_ROOT}/scripts/tree-digest.mjs" <app folder>
+```
+
+It digests the contents of the app's code - what git tracks or would track,
+never the history - and leaves out `DEPLOY_REQUEST.md`, `.env*` and
+`.kst-deploy/`, which the steps write as part of their job. A checkpoint
+commit changes nothing in it; a changed line of code always does.
+
+An approved result is **still current** when the `chain` from its line to
+now is unbroken: every later line's `before` equals the `after` above it,
+and the last line's `after` equals the digest now. In words: every change to
+the code since that step finished was made by a later step of this run. The
+four agents that change code - deployment, secrets-manager, auth,
+app-logging - run one after another on purpose, and a change one of them
+makes does not void the ones before it. What covers their changes is what
+runs after them on the finished code: security-review, which reads all of
+it, and the verifier's build re-check.
+
+A **break** - a line's `before`, or the digest now, differs from the
+`after` above it - means something outside the chain changed the code: the
+builder, or an edit you made yourself. Every result recorded before the
+break is no longer current. Start the chain list again at the current
+digest and re-run what "Deciding what re-runs" below calls for; a step you
+decide the change did not need is recorded `not-applicable` with its
+reason, and a line whose `before` and `after` are both the current digest.
+
+This is why a fix goes through the agent that owns it, never through your
+own hands: a leaked secret back to secrets-manager, a logging gap to
+app-logging, a build or spec problem to deployment. Their change stays
+inside the chain. The same fix made by hand breaks it, and costs a re-run of
+everything before it.
 
 **Housekeeping you own:** create the `.kst-deploy/` folder when you first
 write the record, and make sure `.gitignore` covers `.kst-deploy/` - add
@@ -229,7 +270,7 @@ skill.
 
 **Cost.** Every sub-agent launch and every turn is paid for by the
 builder's team. Launch each agent once per run; never re-launch an agent
-whose run-record entry is approved on the current digest; pass each agent
+whose run-record entry is approved and still current; pass each agent
 only what its row says; do not narrate the chain step by step - one short
 line to the builder per step at most.
 
@@ -321,15 +362,16 @@ intake writes its own short `intake` entry instead.
 | 5 - choosing the audience (key `access-manager`) | Nothing - you do this yourself, following `references/choosing-the-audience.md`, from the builder's answer at the intake | The builder made an explicit choice of who may open the app at the intake - named people or a team, no default, and no unconfirmed "everyone" - and it is recorded in valid form. This step owns the final recorded audience |
 | security-review | The entire current state of the app, not a diff | The whole finished tree was read for leaked secrets and misconfigurations, and anything found was fixed and re-checked |
 | 7 - settling the name (key `create-repo`) | Nothing - you do this yourself, following `references/settling-the-name.md`, from the name the builder approved at the intake | The builder has approved the app's name and that name is written into `DEPLOY_REQUEST.md`, the deployment details are complete, and the description and tags are recorded |
-| verifier (the `verifying-and-sending` skill, loaded here) | The run record on disk: every step above, its verdict, its finished-at timestamp, its what-was-checked line, its findings and its tree digest | The verifier takes it from here. Its approval is the only "ready" that exists |
+| verifier (the `verifying-and-sending` skill, loaded here) | The run record on disk: every step above, its verdict, its finished-at timestamp, its what-was-checked line, its findings and its tree digest, and the `chain` | The verifier takes it from here. Its approval is the only "ready" that exists |
 
-If an agent - or one of your own steps - ends **not approved**, stop the chain there. Fix what it
-found - with the builder where the fix is theirs to decide, on their behalf
-where it is mechanical - then re-run that step, and then continue. Never
-carry a not-approved result forward hoping the verifier will overlook it.
-It will not. And never restart the chain from the top because of it: the
-agents before it are in the run record with their digests, and they re-run
-only if the fix changed the tree.
+If an agent - or one of your own steps - ends **not approved**, stop the chain there. Get what it
+found fixed - with the builder where the fix is theirs to decide, and
+through the agent that owns that kind of fix where it is mechanical (see
+"Which results are still current") - then re-run the step that reported it,
+and continue. Never carry a not-approved result forward hoping the verifier
+will overlook it. It will not. And never restart the chain from the top
+because of it: a fix made by an agent in the chain leaves every result
+before it current.
 
 ## Deciding what re-runs after an ordinary change
 
@@ -393,7 +435,7 @@ skipped check and is treated as one.
 - **Fail closed.** If you cannot determine what changed - the history is
   confusing, a file will not read, the run record will not parse, a tool
   fails - you do not guess a smaller set of agents. Run the full chain.
-  (A readable run record whose digests match is a determination, not a
+  (A readable run record whose chain is unbroken is a determination, not a
   guess: that is the one case where skipping is allowed.) If even that cannot run, report plainly
   that the checks could not complete and the app is not ready to send, and
   say what you will do next. Never "it's probably fine".
