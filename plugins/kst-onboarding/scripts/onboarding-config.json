@@ -1,0 +1,13 @@
+{
+  "//": "Non-secret settings for the onboarding flow. The starter repository is the single source of the app shape Keshet builds; onboarding clones it fresh as the new base. NOTHING SECRET GOES IN THIS FILE.",
+  "starter": {
+    "//": "Where the clean starter base comes from. cloneUrl is what `git clone` receives; branch is the ref taken as the base.",
+    "repo": "Keshet-Broadcasting/kst.claude.core",
+    "cloneUrl": "https://github.com/Keshet-Broadcasting/kst.claude.core.git",
+    "branch": "main"
+  },
+  "output": {
+    "//": "The new base lands in a sibling folder next to the source project. The folder name is the source folder name plus this suffix; if that path is taken, a numeric suffix is added (-kst-2, -kst-3, ...).",
+    "siblingSuffix": "-kst"
+  }
+}

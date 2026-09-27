@@ -402,7 +402,7 @@ const runChecks = async (context) => {
 };
 
 const summarise = (shape, checks) => {
-  if (shape === 'not-starter') return 'This app was started outside the shape Keshet builds, so it has to be moved into the starter before anything else can be checked.';
+  if (shape === 'not-starter') return 'This app is not on the starter Keshet builds. It must be brought onto the starter first, with the kst-onboarding plugin, in its own session - the deploy chain does not do that.';
   const firstFail = checks.find((c) => c.status === 'fail');
   if (firstFail) return `The app is not ready for Keshet yet: ${firstFail.detail}`;
   const notRun = checks.filter((c) => c.status === 'skipped').map((c) => c.name);

@@ -64,11 +64,9 @@ answers are the builder's own earlier words) - and draft:
   reaches nothing outside itself. What each one holds is what lets the
   sign-in check decide without coming back to the builder.
 
-While you read, note whether the app is in Keshet's shape at all:
-`package.json` with `next` among its dependencies, `pnpm-lock.yaml`, and a
-health route under `app/api/health`. A single HTML file, a static site, or
-an app written from scratch in another framework is not, and moving it into
-that shape is the builder's decision - it goes in the questions below.
+You do not check here whether the app is on the starter: the orchestrator's
+fast conformance gate already did that before the intake, and stopped the run
+if it was not. By the time you are here, the app is in Keshet's shape.
 
 Do not launch an agent for this. It is a short read, not a check.
 
@@ -120,15 +118,10 @@ repeat the value back.
 Never ask for a value Keshet sets on the running app, and never for one the
 builder could only answer with "I have no idea" (see the skill).
 
-**Question 4 - only if the app is not in Keshet's shape.** Ask once:
-
-> "Keshet builds apps in one particular shape, and this app was started
-> outside it. I can move what you've built into that shape - your pages and
-> logic stay as they are, they just get the frame Keshet expects around
-> them. OK to do that?"
-
-Pass their yes to the deployment agent, which does the move. A no ends the
-run: say plainly that Keshet can only take the app in that shape.
+There is no starter-shape question here. A project that is not on the starter
+never reaches this intake - the fast conformance gate stops it first and tells
+the builder to adapt it with the kst-onboarding plugin, in its own session.
+The deploy chain never moves an app onto the starter.
 
 ## 4. Follow-ups, in the same sitting
 
