@@ -1,6 +1,6 @@
 ---
 name: deploying-your-app
-description: Load whenever the builder expresses deploy intent in any wording - "deploy", "publish", "ship it", "put it live", "share it with the team", "send it", "give them a link", or anything that means another person needs to open the app - and after any conversation that changed code, to decide which deployment checks must re-run. You then act as the orchestrator: you launch the check agents as sub-agents in a fixed order, ask the builder every question once, at the start (the intake, which also signs them in), then run the whole chain without stopping for approval, and hand the run record to the verifier, which is the only thing that ever sends. The builder never names an agent; this skill is how their intent becomes the right sequence of checks. V:0.1.17
+description: Load whenever the builder expresses deploy intent in any wording - "deploy", "publish", "ship it", "put it live", "share it with the team", "send it", "give them a link", or anything that means another person needs to open the app - and after any conversation that changed code, to decide which deployment checks must re-run. You then act as the orchestrator: you launch the check agents as sub-agents in a fixed order, ask the builder every question once, at the start (the intake, which also signs them in), then run the whole chain without stopping for approval, and hand the run record to the verifier, which is the only thing that ever sends. The builder never names an agent; this skill is how their intent becomes the right sequence of checks. V:0.1.18
 ---
 
 # Deploying your app - you are the orchestrator
@@ -43,6 +43,45 @@ Not everything needs to re-run for every change, but the burden of proof is
 on skipping: **if you are unsure whether an agent needs to re-run, re-run
 it.** A re-run costs a little. Skipping costs more, because a skipped check surfaces
 later as a refused deploy or, worse, as an app that shipped unchecked.
+
+## First of all: the fast conformance gate
+
+Before you say anything about deploying, and before any other step, check one
+thing quickly: is this project on the Keshet starter at all? Keshet builds
+apps in one shape, and a project that is not in that shape cannot be deployed
+- there is nothing to send. Catch that in seconds, at the very start, so the
+builder is not walked through an intake for a deploy that cannot happen.
+
+Run the fast gate on the project root - it only looks at markers on disk, it
+installs and builds nothing:
+
+```
+node "${CLAUDE_PLUGIN_ROOT}/scripts/conformance-check.mjs" <project root>
+```
+
+Its last line is one JSON object: `conformant`, `missing`, `summary`. Exit 0
+means conformant.
+
+- **Conformant (exit 0):** say nothing about it. Continue to the opening
+  message below and the intake as normal.
+- **Not conformant (exit 1), or the gate could not run (exit 2):** stop the
+  deploy here. Do not run the intake, do not sign in, do not launch any agent,
+  do not send anything. This is a **stop-and-explain**, not a redirect: you do
+  not adapt the project, you do not start onboarding for them, you do not
+  invoke another skill. You explain, in plain language, what has to happen and
+  that they do it themselves - in a **new** session. Say it in words like
+  these:
+
+  > "Before this can be deployed, it needs to be brought onto the company
+  > starter - the shape Keshet builds and deploys. That is a separate job, and
+  > it happens in its own session. Open a new session in this project and ask
+  > to 'adapt this project to the starter'. That will rebuild your app on the
+  > starter in a new folder, leaving this one untouched. Once that's done,
+  > come back and we'll deploy it."
+
+  Do not deploy anything until a later run finds the project conformant.
+  Onboarding is the kst-onboarding plugin's job and the builder's decision to
+  start; your gate only checks and explains.
 
 ## Before anything else: tell them what is coming
 
@@ -355,7 +394,7 @@ intake writes its own short `intake` entry instead.
 | Step | You pass it | Approved means |
 | :-- | :-- | :-- |
 | 0 - intake (key `intake`) | Nothing - you do this yourself, following `references/intake.md` | The builder is signed in (or will be at the send), approved the name, purpose, catalogue line, tags and data sources you drafted, and chose the audience - all of it written into `DEPLOY_REQUEST.md` |
-| deployment | What changed since its last run (all of it on a full chain), and the builder's yes if the intake asked to move the app into Keshet's shape. The builder's answers are already in `DEPLOY_REQUEST.md`; it never interviews them | The app matches the platform's build shape, the deployment details in `DEPLOY_REQUEST.md` are complete: what the app is for, what data it reaches, and who it is for - and the app spec in `.kst/app-spec.md` describes the code as it is now, updated on this send only if what the app does changed |
+| deployment | What changed since its last run (all of it on a full chain). The builder's answers are already in `DEPLOY_REQUEST.md`; it never interviews them, and it never moves an app onto the starter - a non-starter project is stopped by the fast conformance gate long before this step | The app matches the platform's build shape, the deployment details in `DEPLOY_REQUEST.md` are complete: what the app is for, what data it reaches, and who it is for - and the app spec in `.kst/app-spec.md` describes the code as it is now, updated on this send only if what the app does changed |
 | secrets-manager | The current source tree, plus any new external connection the conversation introduced | No key, password, or token is left anywhere in the source. Each one lives in the app's own `.env` file, which is where real values belong on this machine: it is kept out of version control and out of everything sent to Keshet. Every secret the app needs is declared by name, and those names are exactly the keys in `.env` |
 | auth | The list of data sources from the deployment details, what each one holds in the builder's words from the intake, and the declared secret names | The app passes each end user's own sign-in through to every data source it touches, so the data source decides what that user may see |
 | app-logging | The current source tree and the list of user-facing actions the app has | Logs exist for user actions, errors, and data access, and the configuration will actually deliver them - not just that logging lines were added |

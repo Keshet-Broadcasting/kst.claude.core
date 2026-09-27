@@ -15,6 +15,11 @@
       "name": "auto-deployment",
       "source": "./plugins/auto-deployment",
       "description": "Builder-facing agents and skills for deploying to the KST platform through the push-broker."
+    },
+    {
+      "name": "kst-onboarding",
+      "source": "./plugins/kst-onboarding",
+      "description": "Adapts an existing web frontend onto the kst.claude.core starter so the auto-deployment plugin can later deploy it."
     }
   ]
 }

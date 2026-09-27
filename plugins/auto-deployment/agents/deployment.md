@@ -41,20 +41,27 @@ request is sent, where every failure costs the builder a full round trip.
 (`package.json` with `next` in dependencies, `pnpm-lock.yaml`, the health
 route under `app/api/health`) - a single HTML file, a static site, a Python
 or Express app written from scratch. That is not a build-contract problem
-to patch around, and the script ran nothing else. The orchestrator asks
-the builder about this at the intake. If it passed you their yes, set up a
-starter copy, carry their work into it, and run the script on the result.
-If it did not, stop and report **not approved**, with this as your
-question:
+to patch around, and the script ran nothing else.
 
-> "Keshet builds apps in one particular shape, and this app was started
-> outside it. I can move what you've built into that shape - your pages and
-> logic stay as they are, they just get the frame Keshet expects around
-> them. OK to do that?"
- Never invent a server, a build script or a health
-route to make a non-starter app pass: that produces an app that builds once
-and is nobody's shape, and it is where the "add Express to satisfy the
-contract" and "fix the echo build script" fixes came from.
+Adapting a non-starter project onto the starter is **not your job, and not
+the deploy chain's job at all** - it is the kst-onboarding plugin's, run by
+the builder in its own session. The orchestrator's fast conformance gate is
+meant to stop such a project before you ever start, so in a normal run you
+will not see `not-starter`. If you do see it, something got past the gate:
+stop and report **not approved**, and give the builder this, as a
+stop-and-explain - you do not adapt anything, and you do not start onboarding
+for them:
+
+> "Before this can be deployed it needs to be brought onto the company
+> starter - the shape Keshet builds. That's a separate job that runs in its
+> own session. Open a new session in this project and ask to 'adapt this
+> project to the starter'. Once that's done, come back and we'll deploy it."
+
+Never set up a starter and carry the app into it here, and never invent a
+server, a build script or a health route to make a non-starter app pass:
+that produces an app that builds once and is nobody's shape, and it is where
+the "add Express to satisfy the contract" and "fix the echo build script"
+fixes came from.
 
 ### Then: the checks
 
