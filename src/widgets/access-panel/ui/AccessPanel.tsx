@@ -7,13 +7,6 @@ import { useThemeStore } from '@/shared/lib/themeStore';
 import { KstAuthWidget } from '@/shared/embeds';
 import styles from './AccessPanel.module.css';
 
-/**
- * The scope that produces a token `kst.auth.api` accepts. Each auth-API environment has its
- * own app registration; deployed apps talk to stage, so this is the stage audience. The data
- * environment (which app's users are managed) is still derived from `azure-app-id`.
- */
-const AUTH_API_SCOPE = 'api://39f9ffc3-ca80-4a61-bb84-ee283b46fcf3/.default';
-
 interface AccessPanelProps {
   /**
    * This app's own Entra registration (client) id. The deploy pipeline injects it as
@@ -33,10 +26,12 @@ function AccessWidgetWithHostToken({ azureAppId }: { azureAppId: string }) {
   const { instance } = useMsal();
   const theme = useThemeStore((state) => state.theme);
 
-  // Called by the widget on every request, so MSAL's silent renewal keeps the token fresh.
+  // The widget needs this host app's own user token - audienced to the app's own registration,
+  // so the scope is built from its azure-app-id, not a shared auth-API scope. Called by the
+  // widget on every request, so MSAL's silent renewal keeps the token fresh.
   const getToken = useCallback(
-    () => acquireAccessToken(instance, [AUTH_API_SCOPE]),
-    [instance],
+    () => acquireAccessToken(instance, [`api://${azureAppId}/.default`]),
+    [instance, azureAppId],
   );
 
   return (

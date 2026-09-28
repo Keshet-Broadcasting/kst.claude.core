@@ -23,8 +23,9 @@ interface KstAuthWidgetAttributes
   /** Optional colour theme. Defaults to 'dark'. */
   theme?: 'light' | 'dark';
   /**
-   * Optional. Supplies the kst.auth.api bearer token so the widget does not run its own
-   * login. Called on every request. Set as a property, never as an attribute.
+   * Optional. Supplies the host app's own bearer token (audienced to `api://{azureAppId}`, for
+   * kst.auth.api) so the widget does not run its own login. Called on every request. Set as a
+   * property, never as an attribute.
    */
   getToken?: () => string | Promise<string>;
 }
