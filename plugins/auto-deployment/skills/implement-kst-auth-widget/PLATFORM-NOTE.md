@@ -59,12 +59,16 @@ implementation gap analysis §9 item 3.
    for every archetype the platform supports, so #17's shape is not constrained
    by it.)*
 
-2. **Each host app needs admin-consented delegated access** to the auth API's
-   app registration - **one grant per host application**, not one per
-   environment. That is a recurring per-app manual grant with the same failure
-   mode as the per-app Key Vault grant: if it needs a Keshet ticket every time,
-   it becomes the slowest step in the flow. Tracked as **P12** in
-   MVP_requirements §3, and it must be resolved the same way D-6 resolves P11.
+2. **Each host app must expose its own API scope** - an Application ID URI
+   (`api://{clientId}`) with an exposed `.default` scope on the host app's own
+   registration, so MSAL can mint a token audienced to that same app for the
+   widget. That is a per-app registration setup, not one per environment. With
+   the same failure mode as the per-app Key Vault grant: if it needs a Keshet
+   ticket every time, it becomes the slowest step in the flow. Tracked as **P12**
+   in MVP_requirements §3, and it must be resolved the same way D-6 resolves P11.
+   (This supersedes an earlier description of P12 as *delegated access to the
+   auth API* - the token is the host app's own, audienced to itself, not the
+   auth API's.)
 
 If P12 is not resolved, embedding this widget in #17 makes every new app wait on
 a ticket. That is a reason to decide P12 before choosing the shape of #17, not
@@ -75,12 +79,12 @@ after.
 Already recorded in MVP_requirements §3 as confirmed - do not re-request from
 Keshet:
 
-- the widget bundle is at `https://app-stage.keshet-tv.com/widgets/kst.auth.widget.js`,
+- the widget bundle is at `https://s3.us-east-1.amazonaws.com/app.keshet-tv.com/widgets/kst.auth.widget.js`,
   one URL, no dev/stage/prod switch
-- the auth API scope is per environment: stage (deployed apps) is
-  `api://39f9ffc3-ca80-4a61-bb84-ee283b46fcf3/.default`, prod is
-  `api://eb246617-67aa-485f-8744-b83e79f19064/.default`, and
-  `api://061fb9ea-aac5-40c6-a1ea-b9681da5a367/.default` is the local dev API only
+- the token the widget receives from the host is the **host app's own** user
+  token, audienced to the host app's own registration - the scope is
+  `api://{azureAppId}/.default`, derived from the same `azure-app-id` passed to
+  the widget, not a fixed auth-API scope
 - the API derives the environment from `azure-app-id`, and Keshet's app
   registrations are per environment
 - the widget is an Angular Elements custom element using Shadow DOM, with its

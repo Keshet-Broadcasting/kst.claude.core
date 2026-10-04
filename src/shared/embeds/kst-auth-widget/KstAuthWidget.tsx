@@ -25,7 +25,8 @@ export interface KstAuthWidgetProps {
   /**
    * Hands the widget your already-signed-in identity. Strongly preferred when the host
    * app uses MSAL: without it the widget opens its own login popup, asking the user to
-   * sign in a second time. The token's audience must be the auth-API's app registration.
+   * sign in a second time. The token must be this host app's own user token, audienced to
+   * the host app's own registration (`api://{azureAppId}`) - not the auth-API's.
    */
   getToken?: TokenProvider;
   /** Optional wrapper styling (the element is Shadow-DOM isolated; only size/position it). */

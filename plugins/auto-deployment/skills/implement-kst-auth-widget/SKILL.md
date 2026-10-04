@@ -1,6 +1,6 @@
 ---
 name: implement-kst-auth-widget
-description: Use when adding, embedding, or integrating the Keshet KST auth/permissions widget (`<kst-auth-widget>`, the user/permission manager) into an app - React (typed wrapper, React 19+) or plain HTML served by any backend - e.g. "add the permissions widget", "show who has access to app X", "embed kst-auth-widget", or when the widget is already embedded and the user wants to stop it prompting a second login ("pass our MSAL token to the widget", "getToken"). Covers loading the single hosted bundle, reading the app id from the platform (never asking the builder for it), and wiring the host's token provider. Do NOT use for building the widget itself (the Angular kst.auth.widget project) or for a custom, from-scratch permissions/roles UI. V:0.1.18
+description: Use when adding, embedding, or integrating the Keshet KST auth/permissions widget (`<kst-auth-widget>`, the user/permission manager) into an app - React (typed wrapper, React 19+) or plain HTML served by any backend - e.g. "add the permissions widget", "show who has access to app X", "embed kst-auth-widget", or when the widget is already embedded and the user wants to stop it prompting a second login ("pass our MSAL token to the widget", "getToken"). Covers loading the single hosted bundle, reading the app id from the platform (never asking the builder for it), and wiring the host's token provider. Do NOT use for building the widget itself (the Angular kst.auth.widget project) or for a custom, from-scratch permissions/roles UI. V:0.1.19
 ---
 
 # Implement `<kst-auth-widget>` in an app
@@ -19,7 +19,7 @@ which supports custom elements natively.
 **There is exactly one bundle.** One script, one URL:
 
 ```
-https://app-stage.keshet-tv.com/widgets/kst.auth.widget.js
+https://s3.us-east-1.amazonaws.com/app.keshet-tv.com/widgets/kst.auth.widget.js
 ```
 
 Do not build a dev/stage/prod URL switch, an `env` prop, or a `scriptSrc` override — there is
@@ -67,7 +67,9 @@ default behaviour.
 This is the part most integrations get wrong, so it's worth understanding rather than copying.
 
 Every call the widget makes to `kst.auth.api` needs an Azure AD bearer token whose **audience is
-the auth-API's own app registration**. There are two ways to get one:
+the host app's own registration** — the same app you pass as `azureAppId`. The token is *that*
+app's own user token, minted from the host's MSAL session; it is **not** audienced to a shared
+auth-API registration. There are two ways to get one:
 
 - **The host supplies it (`getToken`).** The host app has already signed the user in, so it mints
   the token and hands it over. No popup, and the host's origin does **not** have to be registered
@@ -80,17 +82,17 @@ the auth-API's own app registration**. There are two ways to get one:
 So: **if the host app uses MSAL, wire up `getToken`.** Only fall back to the widget's own login
 for hosts that have no Azure AD session of their own.
 
-The scope to request is the auth-API app registration of the environment the app talks to.
-Deployed apps talk to stage:
+The scope to request is the **host app's own** `.default`, built from the same `azure-app-id`
+you pass to the widget — not a fixed, shared auth-API scope:
 
 ```
-api://39f9ffc3-ca80-4a61-bb84-ee283b46fcf3/.default   # stage (deployed apps)
-api://eb246617-67aa-485f-8744-b83e79f19064/.default   # prod
-api://061fb9ea-aac5-40c6-a1ea-b9681da5a367/.default   # local dev API only
+api://{azureAppId}/.default
 ```
 
-A token minted for the wrong audience is rejected by the API, and requesting an unconsented
-scope makes MSAL's redirect flow fail outright - so this GUID must match the deployed API.
+Same app signs the user in, and same app the token is *for*. So the scope changes per
+integration and **must not be hardcoded**. A token minted for the wrong audience is rejected,
+and requesting an unconsented scope makes MSAL's redirect flow fail outright — so the scope must
+be built from the running app's own `azure-app-id`.
 
 Typical host wiring with `@azure/msal-react`:
 
@@ -99,23 +101,23 @@ import { useCallback } from 'react';
 import { useMsal } from '@azure/msal-react';
 import { KstAuthWidget } from './kst-auth-widget/KstAuthWidget';
 
-const AUTH_API_SCOPE = 'api://39f9ffc3-ca80-4a61-bb84-ee283b46fcf3/.default'; // stage auth API
-
 // Set by the deploy pipeline on the running app. Read it server-side (Next.js: in the
 // server component and pass it down as a prop); never hard-code it.
 export function PermissionsPage({ azureAppId }: { azureAppId: string | undefined }) {
   const { instance, accounts } = useMsal();
 
-  // Called on every widget request, so silent renewal is handled by MSAL and the
-  // widget never holds a stale token. Keep the identity stable with useCallback.
+  // The scope is the host app's own `.default`, built from its azure-app-id - the token is
+  // audienced to this same app, not to a shared auth API. Called on every widget request, so
+  // silent renewal is handled by MSAL and the widget never holds a stale token.
   const getToken = useCallback(async () => {
+    if (!azureAppId) throw new Error('azureAppId is required to acquire a token');
     const account = instance.getActiveAccount() ?? accounts[0];
     const result = await instance.acquireTokenSilent({
       account,
-      scopes: [AUTH_API_SCOPE],
+      scopes: [`api://${azureAppId}/.default`],
     });
     return result.accessToken;
-  }, [instance, accounts]);
+  }, [instance, accounts, azureAppId]);
 
   if (!azureAppId) {
     return <p>The access panel is not configured: KST_AZURE_APP_ID is not set.</p>;
@@ -138,10 +140,12 @@ Two properties of the contract that shape the code:
   authentication doesn't want a login popup appearing behind its back. So surface provider errors
   where the developer will see them.
 
-**Azure AD prerequisite:** the host's app registration needs **delegated** access to the auth-API's
-app registration, admin-consented, or `acquireTokenSilent` fails with a consent error. This is one
-grant per host application, **not** one per environment — the API is a single deployment with a
-single audience. Flag this to the user; it usually needs someone with tenant admin rights.
+**Azure AD prerequisite:** the token is audienced to the **host app's own registration** (the one
+behind `azureAppId`) — that's what `api://{azureAppId}/.default` asks for. For MSAL to issue it,
+that registration must be set up to accept a token for itself: an **Application ID URI**
+(`api://{clientId}`) with an exposed API scope. If `acquireTokenSilent` fails with a scope or
+consent error, that setup is missing. Flag it to the user; it usually needs someone with rights on
+the app registration.
 
 ## Prerequisites — check first
 
@@ -195,7 +199,7 @@ typed into the HTML.
 2. **Load the bundle once**, on the page behind sign-in:
 
    ```html
-   <script src="https://app-stage.keshet-tv.com/widgets/kst.auth.widget.js" defer></script>
+   <script src="https://s3.us-east-1.amazonaws.com/app.keshet-tv.com/widgets/kst.auth.widget.js" defer></script>
    ```
 
 3. **Render the element only when the id is present.** If the injected value is empty, show
@@ -205,9 +209,10 @@ typed into the HTML.
 
    ```js
    const el = document.querySelector('kst-auth-widget');
+   const azureAppId = el.getAttribute('azure-app-id'); // the id the server injected
    el.getToken = async () => {
      const account = msal.getActiveAccount() ?? msal.getAllAccounts()[0];
-     const r = await msal.acquireTokenSilent({ account, scopes: [AUTH_API_SCOPE] });
+     const r = await msal.acquireTokenSilent({ account, scopes: [`api://${azureAppId}/.default`] });
      return r.accessToken;
    };
    ```
@@ -242,7 +247,7 @@ typed into the HTML.
 | Mistake | Fix |
 |---------|-----|
 | Asking the builder for the app id, or scaffolding with a placeholder GUID | The builder does not have it and cannot get it. Read `KST_AZURE_APP_ID` from the environment; the pipeline sets it on first deploy. |
-| Adding an `env` prop or dev/stage/prod URL map | There is one bundle at `https://app-stage.keshet-tv.com/widgets/kst.auth.widget.js`. The environment follows from `azure-app-id`. |
+| Adding an `env` prop or dev/stage/prod URL map | There is one bundle at `https://s3.us-east-1.amazonaws.com/app.keshet-tv.com/widgets/kst.auth.widget.js`. The environment follows from `azure-app-id`. |
 | Skipping `getToken` in an app that already uses MSAL | The user gets a second login popup for an identity they've already provided. Wire the provider. |
 | Passing `getToken` as an attribute, or dash-cased | It's a property, camelCase: `getToken={fn}`. |
 | Resolving the token once and returning the cached string | The provider is called per request precisely so the token can be renewed. Return a fresh one each call. |
