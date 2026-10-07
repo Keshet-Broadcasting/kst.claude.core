@@ -18,6 +18,8 @@ Think of `NEXT_PUBLIC_` as writing on a whiteboard in a public hallway. Anyone w
 
 ---
 
+> Database: the app uses a local SQLite file, so there is no connection string or password. Only `DATABASE_PATH` (a plain path) is needed - see the `database` skill.
+
 ## Three rules — read these before adding any env var
 
 **Rule 1 — `NEXT_PUBLIC_` is public.** Never put a secret, API key, database credential, or anything with write or billing access behind `NEXT_PUBLIC_`. If you are unsure whether a value is "public", treat it as private.
