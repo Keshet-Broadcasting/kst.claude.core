@@ -30,6 +30,13 @@ reason>
 fully reproduced, anything the builder should check or decide. If there is
 nothing, say so plainly.>
 
+## Data
+
+<where the app's data lived before and how it is stored now: always a SQLite
+file managed through Sequelize migrations. List the tables that were created.
+Say plainly if any existing data still has to be copied over by hand, or if a
+shared database had to stay external.>
+
 ## Secrets that were moved
 
 <any keys, tokens or connection strings that were found in the old code and

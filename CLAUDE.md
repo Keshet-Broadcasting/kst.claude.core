@@ -113,6 +113,7 @@ writing code in its domain.
 - `css-modules` — design tokens, theming, dark mode.
 - `embeds` — `pnpm embed:add`, custom element lifecycle, `embed.json`.
 - `definition-of-done` (auto-deployment plugin) - what "done" means before reporting work complete, and before sending to Keshet.
+- `database` — the only database: SQLite via Sequelize, UUID ids, JSON columns, a Sequelize migration per schema change.
 - `env-vars` — `.env.local`, `NEXT_PUBLIC_`, zod validation. For anything secret, the `secrets-in-your-app` skill from the auto-deployment plugin wins.
 - `start-with-a-repo` - version history exists from the very first change; fires at the start of building.
 - `sharing-your-work` (auto-deployment plugin) - all version control and sending to Keshet, operated on the user's behalf in plain language.

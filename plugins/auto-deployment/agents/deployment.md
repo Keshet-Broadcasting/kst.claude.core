@@ -239,6 +239,10 @@ The sections and what belongs in them:
   nothing.
 - **Systems it connects to** - every outside service or database in the
   code, by name. Must agree with `data-sources` in the request.
+- **Local database** - the starter's one database is a SQLite file managed
+  through Sequelize migrations (see the starter's `database` skill). List it
+  as a local SQLite data source, and check that `DATABASE_PATH` is read from
+  the environment and that no other database driver is in the code.
 - **How people sign in** - Keshet sign-in, and any role or group the code
   checks beyond it.
 

@@ -42,6 +42,12 @@ log --stat`) and record:
   SharePoint, auth providers, third-party services. For each: what it reads or
   writes, and whether it looks like it should stay external or is a light
   backend that could move into the app.
+- **Stored data.** Every database, table, collection or browser storage the
+  app keeps data in: the engine, each entity with its fields and types, the
+  relations between them, the id scheme, which fields are free-form or nested
+  (candidates for JSON columns), any migrations or seed data, and who reads or
+  writes each. The rebuild moves all of it to SQLite + Sequelize, so exact
+  fields matter.
 - **Behaviours and edge cases.** What the app does beyond rendering - form
   validation, permissions, sorting/filtering, timers, optimistic updates,
   error and empty states. These are what a rebuild silently loses if they are

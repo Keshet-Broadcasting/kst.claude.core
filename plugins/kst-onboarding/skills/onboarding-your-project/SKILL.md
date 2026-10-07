@@ -1,6 +1,6 @@
 ---
 name: onboarding-your-project
-description: Load whenever the builder wants an existing project brought onto the Keshet starter - "adapt this to the starter", "bring my project onto the starter", "rewrite it on your architecture", "make it match the company standard", "onboard this project", and the same intent in any language. This is the onboarding orchestrator: it clones a fresh starter as a new base, rebuilds the existing app inside it using the starter's own skills, verifies the result, and hands the builder a plain-language report. It runs fully autonomously with one checkpoint at the very end. It NEVER deploys and NEVER handles deploy intent - "deploy", "publish", "ship it", "put it live" belong to the auto-deployment plugin. V:0.1.0
+description: Load whenever the builder wants an existing project brought onto the Keshet starter - "adapt this to the starter", "bring my project onto the starter", "rewrite it on your architecture", "make it match the company standard", "onboard this project", and the same intent in any language. This is the onboarding orchestrator: it clones a fresh starter as a new base, rebuilds the existing app inside it using the starter's own skills, verifies the result, and hands the builder a plain-language report. It runs fully autonomously with one checkpoint at the very end. It NEVER deploys and NEVER handles deploy intent - "deploy", "publish", "ship it", "put it live" belong to the auto-deployment plugin. V:0.1.1
 ---
 
 # Onboarding your project - you are the orchestrator
@@ -83,6 +83,11 @@ and never point the clone anywhere else.
 - **Never deploy, and never send anything anywhere.** No contact with the
   Keshet deployment service. When the app is ready you stop and point the
   builder at deployment as a separate, later step.
+- **One database, always SQLite.** Whatever database the source used, the new
+  base stores data in SQLite through Sequelize (UUID ids, JSON columns where
+  data is flexible, a migration per schema change), as the starter's
+  `database` skill says. Never carry over another database driver, and never
+  write a Dockerfile - the platform supplies it.
 - **No secret ever lands in source or in a commit.** Secret-looking values
   found in the source go into the new base's gitignored `.env`, and the code
   reads them as ordinary environment variables. Full secret handling is the
@@ -112,6 +117,8 @@ before writing in its domain:
 - `css-modules` - styling, tokens, theming.
 - `embeds` - any third-party widget, always via `pnpm embed:add`.
 - `env-vars` - environment variables and what may be public.
+- `database` - any stored data: SQLite + Sequelize only, UUID ids, JSON columns,
+  a Sequelize migration for every schema change.
 
 ## The end state
 

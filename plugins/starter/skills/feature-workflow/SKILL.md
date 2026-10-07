@@ -56,6 +56,9 @@ piece of the feature.
 | Is it state, types, or server-data shared by multiple features?    | `entities`                |
 | Is it a pure UI primitive or utility with no business knowledge?   | `shared`                  |
 
+**Stored data:** if the piece saves anything, read the `database` skill first - SQLite +
+Sequelize only, UUID ids, a Sequelize migration for every schema change.
+
 **Layer rules (enforced by steiger + ESLint):**
 
 - Each layer may only import from layers **strictly below** it.

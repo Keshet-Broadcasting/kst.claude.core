@@ -1,7 +1,7 @@
 {
   "name": "kst-onboarding",
   "description": "Keshet onboarding layer: adapts an existing web frontend onto the kst.claude.core starter, so it can later be deployed by the auto-deployment plugin. It pulls a fresh starter, rebuilds the app inside it against the starter's own skills, verifies it, and hands the builder a plain-language report - it never deploys.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": {
     "name": "Keshet",
     "email": "michael@bina-labs.com"

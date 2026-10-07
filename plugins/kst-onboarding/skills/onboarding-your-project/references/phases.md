@@ -94,7 +94,20 @@ For every part of the build, follow the starter skill that governs it -
 `nextjs-16` / `react-19` / `routing` for the framework, `zustand-5` and
 `state-management-guide` for state, `css-modules` for styling, `embeds` for
 any third-party widget (always `pnpm embed:add`, never hand-written),
-`env-vars` for configuration.
+`env-vars` for configuration, `database` for any stored data.
+
+Data storage: whatever database the source used (Postgres, MySQL, Mongo,
+Firebase, Supabase, or data kept only in the browser that must now be
+shared), the new base uses **SQLite through Sequelize** and nothing else -
+follow the `database` skill. Rebuild each table or collection as a Sequelize
+model with a UUID primary key; fold nested or loosely-shaped documents into
+JSON columns; write a Sequelize migration for the initial schema and for every
+later schema change you make during the rebuild; carry over seed or reference
+data as a migration or seed file, never as a committed `.sqlite` file. The
+database file path comes from `DATABASE_PATH` (default `./data/app.sqlite`,
+gitignored). A heavy database that must stay shared with other systems is the
+one exception: it stays external, is called as a data source, and goes in the
+report under "needs your attention".
 
 Handle the backend as the intake settled it: a light backend or simple API
 becomes Next route handlers in the new base; a heavy or separate backend
