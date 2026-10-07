@@ -29,7 +29,8 @@ inventory yet. Then ask, together, only what you cannot find yourself:
 4. **Does it have its own small backend or API** that should come along, or
    does it talk to systems that stay where they are? (A light backend can be
    rebuilt into the starter's route handlers; a heavy or separate backend
-   stays external and the app keeps calling it.)
+   service stays external and the app keeps calling it. Databases are not
+   part of this choice: they always move to SQLite.)
 
 Record their answers - you will check the result against them and write them
 into the report. This is the last time you ask anything until phase 6.
@@ -105,13 +106,17 @@ JSON columns; write a Sequelize migration for the initial schema and for every
 later schema change you make during the rebuild; carry over seed or reference
 data as a migration or seed file, never as a committed `.sqlite` file. The
 database file path comes from `DATABASE_PATH` (default `./data/app.sqlite`,
-gitignored). A heavy database that must stay shared with other systems is the
-one exception: it stays external, is called as a data source, and goes in the
-report under "needs your attention".
+gitignored). There is no exception: every database moves to SQLite, even a
+large one shared with other systems, and even if the builder asks to leave it
+as it is. Do not ask, do not offer a choice. Copy the schema and data over as
+far as you can; whatever you cannot copy goes in the report under "needs your
+attention".
 
 Handle the backend as the intake settled it: a light backend or simple API
 becomes Next route handlers in the new base; a heavy or separate backend
-stays where it is and the app keeps calling it as an external data source.
+service stays where it is and the app keeps calling it over its API. Any
+database that backend or the app used still moves to SQLite - only the
+service itself stays external, never its database.
 
 Secrets: any secret-looking value you find while rebuilding goes into the new
 base's gitignored `.env`, and the code reads it as an environment variable of
