@@ -34,8 +34,7 @@ nothing, say so plainly.>
 
 <where the app's data lived before and how it is stored now: always a SQLite
 file managed through Sequelize migrations. List the tables that were created.
-Say plainly if any existing data still has to be copied over by hand, or if a
-shared database had to stay external.>
+Say plainly if any existing data still has to be copied over by hand.>
 
 ## Secrets that were moved
 

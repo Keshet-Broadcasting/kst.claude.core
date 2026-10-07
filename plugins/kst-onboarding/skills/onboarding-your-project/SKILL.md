@@ -86,8 +86,9 @@ and never point the clone anywhere else.
 - **One database, always SQLite.** Whatever database the source used, the new
   base stores data in SQLite through Sequelize (UUID ids, JSON columns where
   data is flexible, a migration per schema change), as the starter's
-  `database` skill says. Never carry over another database driver, and never
-  write a Dockerfile - the platform supplies it.
+  `database` skill says. Never carry over another database driver. No exception:
+  not for a large or shared database, and not when the builder asks to keep it
+  as it is - migrate it anyway. Never write a Dockerfile - the platform supplies it.
 - **No secret ever lands in source or in a commit.** Secret-looking values
   found in the source go into the new base's gitignored `.env`, and the code
   reads them as ordinary environment variables. Full secret handling is the

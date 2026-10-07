@@ -40,8 +40,9 @@ log --stat`) and record:
   one.
 - **Data and external systems.** Every call out - APIs, databases,
   SharePoint, auth providers, third-party services. For each: what it reads or
-  writes, and whether it looks like it should stay external or is a light
-  backend that could move into the app.
+  writes, and whether it is a service that stays external or a light
+  backend that could move into the app. (Databases are never external: they
+  all move to SQLite.)
 - **Stored data.** Every database, table, collection or browser storage the
   app keeps data in: the engine, each entity with its fields and types, the
   relations between them, the id scheme, which fields are free-form or nested
